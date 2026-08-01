@@ -13,32 +13,7 @@ const UDropdownMenu = resolveComponent("UDropdownMenu");
 const StatusBadge = resolveComponent("CatalogStatusBadge");
 const DistroIcon = resolveComponent("CatalogDistroIcon");
 
-const { clusters, connect, disconnect } = useClusters();
-const toast = useToast();
-
-async function onConnect(id: string) {
-  try {
-    await connect(id);
-  } catch (err) {
-    toast.add({
-      title: "Failed to connect",
-      description: toErrorString(err),
-      color: "error",
-    });
-  }
-}
-
-async function onDisconnect() {
-  try {
-    await disconnect();
-  } catch (err) {
-    toast.add({
-      title: "Failed to disconnect",
-      description: toErrorString(err),
-      color: "error",
-    });
-  }
-}
+const { clusters, connectNotify, disconnectNotify } = useClusters();
 
 // Ticks "now" so relative Last Seen values stay fresh; sub-minute values
 // render as "just now", so a slow tick is enough.
@@ -128,12 +103,12 @@ const columns: TableColumn<ClusterInstance>[] = [
           ? {
               label: "Disconnect",
               icon: "i-lucide-unplug",
-              onSelect: () => onDisconnect(),
+              onSelect: () => disconnectNotify(),
             }
           : {
               label: "Connect",
               icon: "i-lucide-plug",
-              onSelect: () => onConnect(instance.id),
+              onSelect: () => connectNotify(instance.id),
             },
         {
           label: "Details",

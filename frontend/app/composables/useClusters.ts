@@ -59,6 +59,33 @@ export function useClusters() {
     await DisconnectCluster();
   }
 
+  // Toast-surfacing wrappers for UI callers; the raw versions throw.
+  const toast = useToast();
+
+  async function connectNotify(id: string) {
+    try {
+      await connect(id);
+    } catch (err) {
+      toast.add({
+        title: "Failed to connect",
+        description: toErrorString(err),
+        color: "error",
+      });
+    }
+  }
+
+  async function disconnectNotify() {
+    try {
+      await disconnect();
+    } catch (err) {
+      toast.add({
+        title: "Failed to disconnect",
+        description: toErrorString(err),
+        color: "error",
+      });
+    }
+  }
+
   return {
     clusters,
     activeCluster,
@@ -69,5 +96,7 @@ export function useClusters() {
     stopLive,
     connect,
     disconnect,
+    connectNotify,
+    disconnectNotify,
   };
 }

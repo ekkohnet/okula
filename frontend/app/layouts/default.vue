@@ -278,7 +278,7 @@ const namespacesModel = computed<string[]>({
       <template #header>
         <UDashboardNavbar title="" :ui="{ right: 'gap-3' }">
           <template #leading>
-            <ClusterContextButton />
+            <ClusterSwitcher />
           </template>
 
           <template #right>
