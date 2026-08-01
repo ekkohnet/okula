@@ -15,7 +15,6 @@ export interface CatalogEntry {
     "version": string;
     "distro": string;
     "color": string;
-    "avatar": string;
     "createdAt": number;
     "updatedAt": number;
     "lastSeen": number | null;

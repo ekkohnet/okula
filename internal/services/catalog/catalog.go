@@ -49,7 +49,6 @@ type CatalogEntryModel struct {
 	Version        string           `json:"version"`
 	Distro         string           `json:"distro"`
 	Color          string           `json:"color"`
-	Avatar         string           `json:"avatar"`
 	CreatedAt      time.Time        `json:"createdAt"`
 	UpdatedAt      time.Time        `json:"updatedAt"`
 	LastSeen       *time.Time       `json:"lastSeen"`
@@ -67,7 +66,6 @@ type CatalogEntry struct {
 	Version        string           `json:"version"`
 	Distro         string           `json:"distro"`
 	Color          string           `json:"color"`
-	Avatar         string           `json:"avatar"`
 	CreatedAt      int64            `json:"createdAt"`
 	UpdatedAt      int64            `json:"updatedAt"`
 	LastSeen       *int64           `json:"lastSeen"`
@@ -101,7 +99,6 @@ func (c *Catalog) getEntries(ctx context.Context) ([]CatalogEntryModel, error) {
 			Version:        sqlutil.NullStringToString(entry.Version),
 			Distro:         sqlutil.NullStringToString(entry.Distro),
 			Color:          sqlutil.NullStringToString(entry.Color),
-			Avatar:         sqlutil.NullStringToString(entry.Avatar),
 			CreatedAt:      entry.CreatedAt,
 			UpdatedAt:      entry.UpdatedAt,
 			LastSeen:       sqlutil.NullTimeToTime(entry.LastSeen),
@@ -122,11 +119,8 @@ func (c *Catalog) upsertEntry(ctx context.Context, entry CatalogEntryModel) erro
 		ShortName:      sqlutil.StringToNullString(entry.ShortName),
 		KubeconfigPath: sqlutil.StringToNullString(entry.KubeconfigPath),
 		Namespace:      sqlutil.StringToNullString(entry.Namespace),
-		Version:        sqlutil.StringToNullString(entry.Version),
 		Distro:         sqlutil.StringToNullString(entry.Distro),
 		Color:          sqlutil.StringToNullString(entry.Color),
-		Avatar:         sqlutil.StringToNullString(entry.Avatar),
-		LastSeen:       sqlutil.TimeToNullTime(entry.LastSeen),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	})
@@ -215,7 +209,6 @@ func CatalogEntryToDTO(m CatalogEntryModel) CatalogEntry {
 		Version:        m.Version,
 		Distro:         m.Distro,
 		Color:          m.Color,
-		Avatar:         m.Avatar,
 		CreatedAt:      createdAtMs,
 		UpdatedAt:      updatedAtMs,
 		LastSeen:       lastSeenMs,

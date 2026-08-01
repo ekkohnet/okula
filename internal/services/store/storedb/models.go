@@ -19,7 +19,6 @@ type CatalogEntry struct {
 	Namespace      sql.NullString
 	Version        sql.NullString
 	Distro         sql.NullString
-	Avatar         sql.NullString
 	Color          sql.NullString
 	LastSeen       sql.NullTime
 	CreatedAt      time.Time

@@ -1,4 +1,6 @@
 -- name: UpsertCatalogEntry :exec
+-- Owns only kubeconfig-derived fields. Cluster-observed fields (version,
+-- last_seen) are written by the connection layer through its own queries.
 INSERT INTO catalog_entries (
   id,
   type,
@@ -7,15 +9,12 @@ INSERT INTO catalog_entries (
   short_name,
   kubeconfig_path,
   namespace,
-  version,
   distro,
-  avatar,
   color,
-  last_seen,
   created_at,
   updated_at
 ) VALUES (
-  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 )
 ON CONFLICT(id) DO UPDATE SET
   type = excluded.type,
@@ -24,11 +23,8 @@ ON CONFLICT(id) DO UPDATE SET
   short_name = excluded.short_name,
   kubeconfig_path = excluded.kubeconfig_path,
   namespace = excluded.namespace,
-  version = excluded.version,
   distro = excluded.distro,
-  avatar = excluded.avatar,
   color = excluded.color,
-  last_seen = excluded.last_seen,
   created_at = catalog_entries.created_at,
   updated_at = excluded.updated_at;
 

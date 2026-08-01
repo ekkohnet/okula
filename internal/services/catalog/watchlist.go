@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"time"
 
 	"github.com/ekkohnet/okula/internal/services/store"
 	"github.com/ekkohnet/okula/internal/services/store/storedb"
@@ -275,8 +274,6 @@ func (wl *Watchlist) processKubeconfigFile(path string, kubeconfig *api.Config) 
 		shortName := getContextShortName(contextName)
 		colour := generateEntryColor(ID)
 
-		testTime := time.Date(2025, 11, 21, 3, 22, 0, 0, time.UTC)
-
 		entry := CatalogEntryModel{
 			ID:             ID,
 			Hidden:         false,
@@ -284,10 +281,8 @@ func (wl *Watchlist) processKubeconfigFile(path string, kubeconfig *api.Config) 
 			ShortName:      shortName,
 			KubeconfigPath: path,
 			Namespace:      context.Namespace,
-			Version:        "",
 			Distro:         distro,
 			Color:          colour,
-			LastSeen:       &testTime,
 		}
 		if err := wl.catalog.upsertEntry(wl.appCtx, entry); err != nil {
 			wl.log.Error("failed to update catalog entry", "context", contextName, "id", ID, "error", err)

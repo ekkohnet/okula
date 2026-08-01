@@ -23,7 +23,7 @@ func (q *Queries) DeleteCatalogEntry(ctx context.Context, id string) error {
 }
 
 const getCatalogEntry = `-- name: GetCatalogEntry :one
-SELECT id, type, hidden, context_name, short_name, kubeconfig_path, namespace, version, distro, avatar, color, last_seen, created_at, updated_at
+SELECT id, type, hidden, context_name, short_name, kubeconfig_path, namespace, version, distro, color, last_seen, created_at, updated_at
 FROM catalog_entries
 WHERE id = ?
 `
@@ -41,7 +41,6 @@ func (q *Queries) GetCatalogEntry(ctx context.Context, id string) (CatalogEntry,
 		&i.Namespace,
 		&i.Version,
 		&i.Distro,
-		&i.Avatar,
 		&i.Color,
 		&i.LastSeen,
 		&i.CreatedAt,
@@ -196,7 +195,7 @@ func (q *Queries) HideMissingCatalogFileEntries(ctx context.Context, arg HideMis
 }
 
 const listCatalogEntries = `-- name: ListCatalogEntries :many
-SELECT id, type, hidden, context_name, short_name, kubeconfig_path, namespace, version, distro, avatar, color, last_seen, created_at, updated_at
+SELECT id, type, hidden, context_name, short_name, kubeconfig_path, namespace, version, distro, color, last_seen, created_at, updated_at
 FROM catalog_entries
 ORDER BY context_name ASC
 `
@@ -220,7 +219,6 @@ func (q *Queries) ListCatalogEntries(ctx context.Context) ([]CatalogEntry, error
 			&i.Namespace,
 			&i.Version,
 			&i.Distro,
-			&i.Avatar,
 			&i.Color,
 			&i.LastSeen,
 			&i.CreatedAt,
@@ -240,7 +238,7 @@ func (q *Queries) ListCatalogEntries(ctx context.Context) ([]CatalogEntry, error
 }
 
 const listVisibleCatalogEntries = `-- name: ListVisibleCatalogEntries :many
-SELECT id, type, hidden, context_name, short_name, kubeconfig_path, namespace, version, distro, avatar, color, last_seen, created_at, updated_at
+SELECT id, type, hidden, context_name, short_name, kubeconfig_path, namespace, version, distro, color, last_seen, created_at, updated_at
 FROM catalog_entries
 WHERE hidden = 0
 ORDER BY context_name ASC
@@ -265,7 +263,6 @@ func (q *Queries) ListVisibleCatalogEntries(ctx context.Context) ([]CatalogEntry
 			&i.Namespace,
 			&i.Version,
 			&i.Distro,
-			&i.Avatar,
 			&i.Color,
 			&i.LastSeen,
 			&i.CreatedAt,
@@ -293,15 +290,12 @@ INSERT INTO catalog_entries (
   short_name,
   kubeconfig_path,
   namespace,
-  version,
   distro,
-  avatar,
   color,
-  last_seen,
   created_at,
   updated_at
 ) VALUES (
-  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 )
 ON CONFLICT(id) DO UPDATE SET
   type = excluded.type,
@@ -310,11 +304,8 @@ ON CONFLICT(id) DO UPDATE SET
   short_name = excluded.short_name,
   kubeconfig_path = excluded.kubeconfig_path,
   namespace = excluded.namespace,
-  version = excluded.version,
   distro = excluded.distro,
-  avatar = excluded.avatar,
   color = excluded.color,
-  last_seen = excluded.last_seen,
   created_at = catalog_entries.created_at,
   updated_at = excluded.updated_at
 `
@@ -327,15 +318,14 @@ type UpsertCatalogEntryParams struct {
 	ShortName      sql.NullString
 	KubeconfigPath sql.NullString
 	Namespace      sql.NullString
-	Version        sql.NullString
 	Distro         sql.NullString
-	Avatar         sql.NullString
 	Color          sql.NullString
-	LastSeen       sql.NullTime
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
 
+// Owns only kubeconfig-derived fields. Cluster-observed fields (version,
+// last_seen) are written by the connection layer through its own queries.
 func (q *Queries) UpsertCatalogEntry(ctx context.Context, arg UpsertCatalogEntryParams) error {
 	_, err := q.db.ExecContext(ctx, upsertCatalogEntry,
 		arg.ID,
@@ -345,11 +335,8 @@ func (q *Queries) UpsertCatalogEntry(ctx context.Context, arg UpsertCatalogEntry
 		arg.ShortName,
 		arg.KubeconfigPath,
 		arg.Namespace,
-		arg.Version,
 		arg.Distro,
-		arg.Avatar,
 		arg.Color,
-		arg.LastSeen,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
