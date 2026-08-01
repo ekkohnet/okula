@@ -142,7 +142,7 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => {
             <UIcon
               v-if="item.connected"
               name="i-lucide-check"
-              class="size-4 self-center text-muted"
+              class="size-4 self-center text-success"
             />
           </template>
         </UCommandPalette>
