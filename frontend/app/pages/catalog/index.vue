@@ -209,7 +209,7 @@ const slideoverOpen = ref(false);
       :modal="false"
     >
       <template #body>
-        <Placeholder class="h-full" />
+        <AppPlaceholder class="h-full" />
       </template>
     </USlideover>
   </div>
