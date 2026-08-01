@@ -43,7 +43,7 @@ onMounted(() => {
 });
 
 // Example command groups — replace with your real commands
-const groups = [
+const _groups = [
   {
     key: "clusters",
     label: "Clusters",

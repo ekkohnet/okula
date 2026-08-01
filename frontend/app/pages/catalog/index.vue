@@ -15,6 +15,15 @@ const DistroIcon = resolveComponent("CatalogDistroIcon");
 
 const { clusters } = useClusters();
 
+// Ticks "now" so relative Last Seen values stay fresh; sub-minute values
+// render as "just now", so a slow tick is enough.
+const now = ref(Date.now());
+let nowTimer: number | undefined;
+onMounted(() => {
+  nowTimer = window.setInterval(() => (now.value = Date.now()), 30_000);
+});
+onBeforeUnmount(() => window.clearInterval(nowTimer));
+
 const columns: TableColumn<ClusterInstance>[] = [
   {
     id: "select",
@@ -56,11 +65,15 @@ const columns: TableColumn<ClusterInstance>[] = [
     accessorKey: "lastSeen",
     header: "Last Seen",
     cell: ({ row }) => {
-      const lastSeen = row.getValue<Date | null>("lastSeen");
+      const lastSeen = row.getValue<number | null>("lastSeen");
       if (!lastSeen) {
         return h("span", { class: "text-dimmed" }, "Never");
       }
-      return lastSeen.toLocaleString();
+      return h(
+        "span",
+        { title: new Date(lastSeen).toLocaleString() },
+        formatTimeAgo(lastSeen, now.value),
+      );
     },
   },
   {
