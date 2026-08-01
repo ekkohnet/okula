@@ -5,7 +5,7 @@ const navLinks = [
   {
     label: "Overview",
     icon: "i-lucide-layout-dashboard",
-    to: "/cluster/666/",
+    to: "/overview",
   },
   {
     label: "Cluster Events",
