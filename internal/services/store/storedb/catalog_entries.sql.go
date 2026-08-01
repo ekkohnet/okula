@@ -281,6 +281,32 @@ func (q *Queries) ListVisibleCatalogEntries(ctx context.Context) ([]CatalogEntry
 	return items, nil
 }
 
+const markCatalogEntrySeen = `-- name: MarkCatalogEntrySeen :exec
+UPDATE catalog_entries
+SET version = ?1,
+  last_seen = ?2,
+  updated_at = ?3
+WHERE id = ?4
+`
+
+type MarkCatalogEntrySeenParams struct {
+	Version   sql.NullString
+	LastSeen  sql.NullTime
+	UpdatedAt time.Time
+	ID        string
+}
+
+// The connection layer's write path for cluster-observed fields.
+func (q *Queries) MarkCatalogEntrySeen(ctx context.Context, arg MarkCatalogEntrySeenParams) error {
+	_, err := q.db.ExecContext(ctx, markCatalogEntrySeen,
+		arg.Version,
+		arg.LastSeen,
+		arg.UpdatedAt,
+		arg.ID,
+	)
+	return err
+}
+
 const upsertCatalogEntry = `-- name: UpsertCatalogEntry :exec
 INSERT INTO catalog_entries (
   id,

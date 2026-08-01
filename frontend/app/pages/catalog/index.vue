@@ -13,7 +13,32 @@ const UDropdownMenu = resolveComponent("UDropdownMenu");
 const StatusBadge = resolveComponent("CatalogStatusBadge");
 const DistroIcon = resolveComponent("CatalogDistroIcon");
 
-const { clusters } = useClusters();
+const { clusters, connect, disconnect } = useClusters();
+const toast = useToast();
+
+async function onConnect(id: string) {
+  try {
+    await connect(id);
+  } catch (err) {
+    toast.add({
+      title: "Failed to connect",
+      description: toErrorString(err),
+      color: "error",
+    });
+  }
+}
+
+async function onDisconnect() {
+  try {
+    await disconnect();
+  } catch (err) {
+    toast.add({
+      title: "Failed to disconnect",
+      description: toErrorString(err),
+      color: "error",
+    });
+  }
+}
 
 // Ticks "now" so relative Last Seen values stay fresh; sub-minute values
 // render as "just now", so a slow tick is enough.
@@ -96,17 +121,40 @@ const columns: TableColumn<ClusterInstance>[] = [
   {
     id: "actions",
     enableHiding: false,
-    cell: () => {
-      return h(UButton, {
-        icon: "i-lucide-ellipsis-vertical",
-        color: "neutral",
-        variant: "ghost",
-        class: "ml-auto",
-        "aria-label": "Actions dropdown",
-        onClick: () => {
-          slideoverOpen.value = true;
+    cell: ({ row }) => {
+      const instance = row.original;
+      const items = [
+        instance.active
+          ? {
+              label: "Disconnect",
+              icon: "i-lucide-unplug",
+              onSelect: () => onDisconnect(),
+            }
+          : {
+              label: "Connect",
+              icon: "i-lucide-plug",
+              onSelect: () => onConnect(instance.id),
+            },
+        {
+          label: "Details",
+          icon: "i-lucide-panel-right-open",
+          onSelect: () => {
+            slideoverOpen.value = true;
+          },
         },
-      });
+      ];
+      return h(
+        UDropdownMenu,
+        { items, content: { align: "end" } },
+        () =>
+          h(UButton, {
+            icon: "i-lucide-ellipsis-vertical",
+            color: "neutral",
+            variant: "ghost",
+            class: "ml-auto",
+            "aria-label": "Actions dropdown",
+          }),
+      );
     },
   },
 ];

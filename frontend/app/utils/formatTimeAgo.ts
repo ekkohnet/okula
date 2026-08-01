@@ -19,5 +19,5 @@ export function formatTimeAgo(thenMs: number, nowMs: number): string {
       return rtf.format(Math.round(diff / ms), unit);
     }
   }
-  return "just now";
+  return "Just now";
 }

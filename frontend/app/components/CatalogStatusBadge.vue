@@ -9,6 +9,10 @@ const statusColor = computed(() => {
   switch (props.status) {
     case ClusterStatus.ClusterStatusConnected:
       return "success";
+    case ClusterStatus.ClusterStatusConnecting:
+      return "info";
+    case ClusterStatus.ClusterStatusUnreachable:
+      return "error";
     case ClusterStatus.ClusterStatusDisconnected:
       return "neutral";
     case ClusterStatus.$zero:

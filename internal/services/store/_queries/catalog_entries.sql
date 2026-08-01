@@ -33,6 +33,14 @@ SELECT *
 FROM catalog_entries
 WHERE id = ?;
 
+-- name: MarkCatalogEntrySeen :exec
+-- The connection layer's write path for cluster-observed fields.
+UPDATE catalog_entries
+SET version = @version,
+  last_seen = @last_seen,
+  updated_at = @updated_at
+WHERE id = @id;
+
 -- name: DeleteCatalogEntry :exec
 DELETE FROM catalog_entries
 WHERE id = ?;

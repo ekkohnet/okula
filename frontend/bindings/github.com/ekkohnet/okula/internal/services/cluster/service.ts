@@ -14,6 +14,21 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+/**
+ * ConnectCluster makes the catalog entry the active cluster. Config errors
+ * return immediately; reachability is reported via ClustersUpdated events.
+ */
+export function ConnectCluster(id: string): $CancellablePromise<void> {
+    return $Call.ByID(4198706123, id);
+}
+
+/**
+ * DisconnectCluster tears down the active cluster connection, if any.
+ */
+export function DisconnectCluster(): $CancellablePromise<void> {
+    return $Call.ByID(1278477117);
+}
+
 export function GetClusters(): $CancellablePromise<$models.ClusterInstance[] | null> {
     return $Call.ByID(3137912110);
 }

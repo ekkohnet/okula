@@ -66,6 +66,11 @@ func (svc *Service) GetCatalogEntryModels(ctx context.Context) ([]CatalogEntryMo
 	return svc.catalog.getEntries(ctx)
 }
 
+//wails:ignore
+func (svc *Service) GetCatalogEntryModel(ctx context.Context, id string) (CatalogEntryModel, error) {
+	return svc.catalog.getEntry(ctx, id)
+}
+
 // GetCatalogEntries returns catalog entries as DTOs suitable for the frontend.
 func (svc *Service) GetCatalogEntries(ctx context.Context) ([]CatalogEntry, error) {
 	models, err := svc.catalog.getEntries(ctx)

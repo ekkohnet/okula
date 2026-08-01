@@ -88,24 +88,38 @@ func (c *Catalog) getEntries(ctx context.Context) ([]CatalogEntryModel, error) {
 
 	var result []CatalogEntryModel
 	for _, entry := range entries {
-		result = append(result, CatalogEntryModel{
-			ID:             entry.ID,
-			Type:           CatalogEntryType(entry.Type),
-			Hidden:         sqlutil.Int64ToBool(entry.Hidden),
-			ContextName:    entry.ContextName,
-			ShortName:      sqlutil.NullStringToString(entry.ShortName),
-			KubeconfigPath: sqlutil.NullStringToString(entry.KubeconfigPath),
-			Namespace:      sqlutil.NullStringToString(entry.Namespace),
-			Version:        sqlutil.NullStringToString(entry.Version),
-			Distro:         sqlutil.NullStringToString(entry.Distro),
-			Color:          sqlutil.NullStringToString(entry.Color),
-			CreatedAt:      entry.CreatedAt,
-			UpdatedAt:      entry.UpdatedAt,
-			LastSeen:       sqlutil.NullTimeToTime(entry.LastSeen),
-		})
+		result = append(result, entryRowToModel(entry))
 	}
 
 	return result, nil
+}
+
+// getEntry returns the internal domain model for a single catalog entry.
+func (c *Catalog) getEntry(ctx context.Context, id string) (CatalogEntryModel, error) {
+	entry, err := c.store.Queries.GetCatalogEntry(ctx, id)
+	if err != nil {
+		return CatalogEntryModel{}, fmt.Errorf("failed to get catalog entry %q: %w", id, err)
+	}
+
+	return entryRowToModel(entry), nil
+}
+
+func entryRowToModel(entry storedb.CatalogEntry) CatalogEntryModel {
+	return CatalogEntryModel{
+		ID:             entry.ID,
+		Type:           CatalogEntryType(entry.Type),
+		Hidden:         sqlutil.Int64ToBool(entry.Hidden),
+		ContextName:    entry.ContextName,
+		ShortName:      sqlutil.NullStringToString(entry.ShortName),
+		KubeconfigPath: sqlutil.NullStringToString(entry.KubeconfigPath),
+		Namespace:      sqlutil.NullStringToString(entry.Namespace),
+		Version:        sqlutil.NullStringToString(entry.Version),
+		Distro:         sqlutil.NullStringToString(entry.Distro),
+		Color:          sqlutil.NullStringToString(entry.Color),
+		CreatedAt:      entry.CreatedAt,
+		UpdatedAt:      entry.UpdatedAt,
+		LastSeen:       sqlutil.NullTimeToTime(entry.LastSeen),
+	}
 }
 
 func (c *Catalog) upsertEntry(ctx context.Context, entry CatalogEntryModel) error {

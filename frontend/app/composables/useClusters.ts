@@ -1,4 +1,4 @@
-import { GetClusters } from "#services/cluster/service";
+import { GetClusters, ConnectCluster, DisconnectCluster } from "#services/cluster/service";
 import type { ClusterInstance } from "#services/cluster/models";
 
 import { Events } from "@wailsio/runtime";
@@ -47,5 +47,27 @@ export function useClusters() {
     isLive.value = false;
   }
 
-  return { clusters, isLoading, error, load, startLive, stopLive };
+  const activeCluster = computed(() => clusters.value.find((c) => c.active) ?? null);
+
+  // Connect/disconnect results arrive via ClustersUpdated events; these only
+  // surface immediate (config) errors to the caller.
+  async function connect(id: string) {
+    await ConnectCluster(id);
+  }
+
+  async function disconnect() {
+    await DisconnectCluster();
+  }
+
+  return {
+    clusters,
+    activeCluster,
+    isLoading,
+    error,
+    load,
+    startLive,
+    stopLive,
+    connect,
+    disconnect,
+  };
 }

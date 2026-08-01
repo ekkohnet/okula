@@ -23,8 +23,12 @@ type Service struct {
 	store   *store.Service
 	catalog *catalog.Service
 
+	appCtx            context.Context
+	offCatalogUpdated func()
+
 	mu       sync.RWMutex
 	clusters map[string]*ClusterInstanceModel
+	active   *connection
 }
 
 func NewService(args ServiceArgs) *Service {
@@ -38,23 +42,58 @@ func NewService(args ServiceArgs) *Service {
 // --- Wails Service Lifecycle ---
 
 func (svc *Service) ServiceStartup(ctx context.Context, opts application.ServiceOptions) error {
+	svc.appCtx = ctx
+
 	svc.mu.Lock()
 	if svc.clusters == nil {
 		svc.clusters = make(map[string]*ClusterInstanceModel)
 	}
 	svc.mu.Unlock()
 
-	// TEMP
-	application.Get().Event.On("CatalogUpdated", func(e *application.CustomEvent) {
-		svc.emitClustersUpdated()
+	svc.offCatalogUpdated = application.Get().Event.On("CatalogUpdated", func(e *application.CustomEvent) {
+		svc.handleCatalogUpdated()
 	})
+
+	// Reconnect asynchronously; startup must not block on an unreachable cluster.
+	go svc.restoreActive()
 
 	svc.log.Info("cluster service started")
 	return nil
 }
 
 func (svc *Service) ServiceShutdown() error {
-	//
+	if svc.offCatalogUpdated != nil {
+		svc.offCatalogUpdated()
+	}
+
+	// Tear down without clearing the persisted active cluster id, so the
+	// connection is restored on next launch.
+	svc.mu.Lock()
+	svc.teardownLocked()
+	svc.mu.Unlock()
+
 	svc.log.Info("cluster service stopped")
 	return nil
+}
+
+// handleCatalogUpdated reacts to catalog changes: if the active entry has
+// disappeared or gone hidden, disconnect; either way the cluster list changed.
+func (svc *Service) handleCatalogUpdated() {
+	svc.mu.RLock()
+	var activeID string
+	if svc.active != nil {
+		activeID = svc.active.entryID
+	}
+	svc.mu.RUnlock()
+
+	if activeID != "" {
+		entry, err := svc.catalog.GetCatalogEntryModel(svc.appCtx, activeID)
+		if err != nil || entry.Hidden {
+			svc.log.Info("active cluster no longer in catalog; disconnecting", "id", activeID)
+			svc.clearActive(true)
+			return // clearActive already emitted ClustersUpdated
+		}
+	}
+
+	svc.emitClustersUpdated()
 }

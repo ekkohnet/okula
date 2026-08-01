@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+type AppState struct {
+	ID              int64
+	ActiveClusterID sql.NullString
+}
+
 type CatalogEntry struct {
 	ID             string
 	Type           string

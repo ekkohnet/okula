@@ -14,7 +14,9 @@ type ClusterStatus string
 
 const (
 	ClusterStatusDisconnected ClusterStatus = "Not Connected"
+	ClusterStatusConnecting   ClusterStatus = "Connecting"
 	ClusterStatusConnected    ClusterStatus = "Connected"
+	ClusterStatusUnreachable  ClusterStatus = "Unreachable"
 )
 
 // ClusterInstanceModel is the internal representation of a cluster instance,
@@ -32,6 +34,7 @@ type ClusterInstance struct {
 	ID        string               `json:"id"`
 	Entry     catalog.CatalogEntry `json:"entry"`
 	Status    ClusterStatus        `json:"status"`
+	Active    bool                 `json:"active"`
 	LastSeen  *int64               `json:"lastSeen,omitempty"`
 	LastError *string              `json:"lastError,omitempty"`
 }
@@ -67,19 +70,15 @@ func (svc *Service) buildClusterList(ctx context.Context) ([]ClusterInstance, er
 		return nil, fmt.Errorf("cluster runtime map is not initialized")
 	}
 
+	var activeID string
+	if svc.active != nil {
+		activeID = svc.active.entryID
+	}
+
 	result := make([]ClusterInstance, 0, len(entries))
 	for _, entry := range entries {
-		model, ok := svc.clusters[entry.ID]
-		if !ok {
-			model = &ClusterInstanceModel{
-				ID:     entry.ID,
-				Entry:  entry,
-				Status: ClusterStatusDisconnected,
-			}
-			svc.clusters[entry.ID] = model
-		} else {
-			model.Entry = entry
-		}
+		model := svc.modelLocked(entry)
+		model.Entry = entry
 
 		// If the catalog has a persisted LastSeen and the runtime instance
 		// does not, initialize the runtime from the persisted value.
@@ -88,7 +87,9 @@ func (svc *Service) buildClusterList(ctx context.Context) ([]ClusterInstance, er
 			model.LastSeen = &t
 		}
 
-		result = append(result, clusterInstanceToDTO(*model))
+		dto := clusterInstanceToDTO(*model)
+		dto.Active = entry.ID == activeID
+		result = append(result, dto)
 	}
 
 	return result, nil

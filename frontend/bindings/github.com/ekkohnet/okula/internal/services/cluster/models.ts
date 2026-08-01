@@ -12,6 +12,7 @@ export interface ClusterInstance {
     "id": string;
     "entry": catalog$0.CatalogEntry;
     "status": ClusterStatus;
+    "active": boolean;
     "lastSeen"?: number | null;
     "lastError"?: string | null;
 }
@@ -23,5 +24,7 @@ export enum ClusterStatus {
     $zero = "",
 
     ClusterStatusDisconnected = "Not Connected",
+    ClusterStatusConnecting = "Connecting",
     ClusterStatusConnected = "Connected",
+    ClusterStatusUnreachable = "Unreachable",
 };
