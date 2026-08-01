@@ -1,0 +1,7 @@
+CREATE TABLE metadata (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  first_run BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+INSERT INTO metadata (id) VALUES (1)
+ON CONFLICT(id) DO NOTHING;

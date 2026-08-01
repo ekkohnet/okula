@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "editorconfig.editorconfig",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "tamasfe.even-better-toml",
+    "redhat.vscode-yaml",
+    "golang.go",
+    "Vue.volar"
+  ]
+}

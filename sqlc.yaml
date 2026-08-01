@@ -1,0 +1,13 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    schema: "internal/services/store/_migrations"
+    queries: "internal/services/store/_queries"
+    gen:
+      go:
+        package: "storedb"
+        out: "internal/services/store/storedb"
+overrides:
+  go:
+    rename:
+      setting: Settings
