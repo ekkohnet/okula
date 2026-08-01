@@ -226,31 +226,9 @@ const resourceLinks = computed<NavigationMenuItem[]>(() =>
   })),
 );
 
-const items = ref(["All Namespaces", "default", "kube-system", "kube-public", "kube-node-lease"]);
-const ALL = "All Namespaces";
-const selection = ref<string[]>([ALL]);
+const { namespaces, selectedNamespaces } = useNamespaces();
 
-const namespacesModel = computed<string[]>({
-  get: () => selection.value,
-  set: (next) => {
-    let nextVal = Array.isArray(next) ? Array.from(new Set(next)) : [];
-    const prevHasAll = selection.value.includes(ALL);
-    const nextHasAll = nextVal.includes(ALL);
-
-    // If user selects "All" while others are selected -> keep only "All"
-    // If "All" was selected and user picks a specific item -> drop "All"
-    if (nextHasAll && nextVal.length > 1) {
-      nextVal = prevHasAll ? nextVal.filter((v) => v !== ALL) : [ALL];
-    }
-
-    // Never allow empty selection -> default to "All"
-    if (!nextHasAll && nextVal.length === 0) {
-      nextVal = [ALL];
-    }
-
-    selection.value = nextVal;
-  },
-});
+const namespaceItems = computed(() => [ALL_NAMESPACES, ...namespaces.value]);
 </script>
 
 <template>
@@ -295,12 +273,12 @@ const namespacesModel = computed<string[]>({
 
           <template #right>
             <USelect
-              v-model="namespacesModel"
+              v-model="selectedNamespaces"
               icon="i-lucide-group"
               size="md"
               multiple
               :disabled="!activeCluster"
-              :items="items"
+              :items="namespaceItems"
               class="min-w-72 max-w-96 ring-default focus:ring-default focus:ring-1"
               :ui="{
                 leadingIcon: 'size-4.5',

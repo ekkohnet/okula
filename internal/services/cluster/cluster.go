@@ -98,3 +98,7 @@ func (svc *Service) buildClusterList(ctx context.Context) ([]ClusterInstance, er
 func (svc *Service) emitClustersUpdated() {
 	application.Get().Event.Emit("ClustersUpdated")
 }
+
+func (svc *Service) emitNamespacesUpdated() {
+	application.Get().Event.Emit("NamespacesUpdated")
+}

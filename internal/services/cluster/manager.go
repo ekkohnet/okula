@@ -42,8 +42,12 @@ func (svc *Service) setActive(id string) error {
 
 	svc.persistActiveID(id)
 	svc.emitClustersUpdated()
+	// The previous cluster's namespaces are gone; the informer refills the
+	// list once its cache syncs.
+	svc.emitNamespacesUpdated()
 
 	go svc.heartbeat(heartbeatCtx, conn)
+	svc.startNamespaceInformer(heartbeatCtx, conn)
 
 	svc.log.Info("cluster connecting", "id", id, "context", entry.ContextName)
 	return nil
@@ -61,6 +65,7 @@ func (svc *Service) clearActive(persist bool) {
 		svc.persistActiveID("")
 	}
 	svc.emitClustersUpdated()
+	svc.emitNamespacesUpdated()
 }
 
 // teardownLocked cancels the active connection and resets its runtime model.

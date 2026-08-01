@@ -32,3 +32,11 @@ export function DisconnectCluster(): $CancellablePromise<void> {
 export function GetClusters(): $CancellablePromise<$models.ClusterInstance[] | null> {
     return $Call.ByID(3137912110);
 }
+
+/**
+ * GetNamespaces returns the active cluster's namespace names, sorted. Empty
+ * when no cluster is active or the informer cache hasn't synced yet.
+ */
+export function GetNamespaces(): $CancellablePromise<string[] | null> {
+    return $Call.ByID(2100773101);
+}

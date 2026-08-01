@@ -1,13 +1,17 @@
 <script setup lang="ts">
-const { load, startLive, stopLive } = useClusters();
+const clusters = useClusters();
+const namespaces = useNamespaces();
 
 onMounted(() => {
-  load();
-  startLive();
+  clusters.load();
+  clusters.startLive();
+  namespaces.load();
+  namespaces.startLive();
 });
 
 onBeforeUnmount(() => {
-  stopLive();
+  clusters.stopLive();
+  namespaces.stopLive();
 });
 </script>
 
