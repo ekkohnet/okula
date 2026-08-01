@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from "@nuxt/ui";
 
-const navLinks = [
+const { activeCluster } = useClusters();
+
+const clusterNavItems = [
   {
     label: "Overview",
     icon: "i-lucide-layout-dashboard",
@@ -25,7 +27,7 @@ const navLinks = [
   },
 ] satisfies NavigationMenuItem[];
 
-const resourceLinks = [
+const resourceNavItems = [
   {
     label: "Cluster",
     icon: "i-lucide-ship-wheel",
@@ -211,6 +213,19 @@ const resourceLinks = [
   },
 ] satisfies NavigationMenuItem[];
 
+// Cluster-scoped links disable without an active cluster; collapsible group
+// headings stay usable so the nav can still be explored.
+const navLinks = computed<NavigationMenuItem[]>(() =>
+  clusterNavItems.map((item) => ({ ...item, disabled: !activeCluster.value })),
+);
+
+const resourceLinks = computed<NavigationMenuItem[]>(() =>
+  resourceNavItems.map((group) => ({
+    ...group,
+    children: group.children?.map((child) => ({ ...child, disabled: !activeCluster.value })),
+  })),
+);
+
 const items = ref(["All Namespaces", "default", "kube-system", "kube-public", "kube-node-lease"]);
 const ALL = "All Namespaces";
 const selection = ref<string[]>([ALL]);
@@ -263,12 +278,9 @@ const namespacesModel = computed<string[]>({
       <template #footer>
         <div class="space-y-2 w-full">
           <div class="flex items-center justify-between text-sm">
-            <span class="text-muted-foreground">Cluster Health</span>
-            <UBadge color="success" size="sm" variant="subtle"> Healthy </UBadge>
-          </div>
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-muted-foreground">Nodes</span>
-            <span>3/3 Ready</span>
+            <span class="text-muted-foreground">Cluster Status</span>
+            <CatalogStatusBadge v-if="activeCluster" :status="activeCluster.status" />
+            <UBadge v-else color="neutral" size="sm" variant="subtle">No Cluster</UBadge>
           </div>
         </div>
       </template>
@@ -287,6 +299,7 @@ const namespacesModel = computed<string[]>({
               icon="i-lucide-group"
               size="md"
               multiple
+              :disabled="!activeCluster"
               :items="items"
               class="min-w-72 max-w-96 ring-default focus:ring-default focus:ring-1"
               :ui="{
