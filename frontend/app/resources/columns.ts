@@ -46,3 +46,10 @@ export function textOrDash(value: string | null | undefined): VNode | string {
 export function ageCell(timestamp: number): VNode {
   return h(TimeAgo, { timestamp });
 }
+
+// truncated caps a potentially long value, with the full text on hover.
+// Multi-line rendering for lists (e.g. ingress hosts) is later polish.
+export function truncated(value: string | null | undefined, widthClass = "max-w-64"): VNode {
+  if (!value) return h("span", { class: "text-dimmed" }, "—");
+  return h("span", { class: `block truncate ${widthClass}`, title: value }, value);
+}

@@ -30,6 +30,9 @@ var definitions = []Definition{
 	cronJobsDefinition,
 	nodesDefinition,
 	namespacesDefinition,
+	servicesDefinition,
+	ingressesDefinition,
+	ingressClassesDefinition,
 }
 
 var registry = func() map[string]Definition {

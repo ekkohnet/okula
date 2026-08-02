@@ -111,7 +111,7 @@ const resourceNavItems = [
       {
         label: "Ingresses",
         icon: "i-carbon-gateway",
-        to: "/resources/ingress",
+        to: "/resources/ingresses",
       },
       {
         label: "Ingress Classes",
