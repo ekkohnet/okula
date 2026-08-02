@@ -18,6 +18,11 @@ type Definition struct {
 	// ProjectRow trims a full object down to the row the list view needs.
 	// Full objects never cross the frontend boundary in lists.
 	ProjectRow func(*unstructured.Unstructured) (map[string]any, error)
+
+	// TransformCache, when set, runs after the common stripping before an
+	// object enters the informer cache — for dropping fields rows never
+	// need (e.g. secret values never sit in memory).
+	TransformCache func(*unstructured.Unstructured)
 }
 
 var definitions = []Definition{
@@ -33,6 +38,19 @@ var definitions = []Definition{
 	servicesDefinition,
 	ingressesDefinition,
 	ingressClassesDefinition,
+	configMapsDefinition,
+	secretsDefinition,
+	hpasDefinition,
+	pdbsDefinition,
+	priorityClassesDefinition,
+	serviceAccountsDefinition,
+	rolesDefinition,
+	roleBindingsDefinition,
+	clusterRolesDefinition,
+	clusterRoleBindingsDefinition,
+	pvcsDefinition,
+	pvsDefinition,
+	storageClassesDefinition,
 }
 
 var registry = func() map[string]Definition {

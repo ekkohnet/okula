@@ -141,7 +141,17 @@ func (svc *Service) startInformerLocked(w *watcher) {
 
 	// Strip fields nothing reads before they enter the cache; managedFields
 	// alone is often a third of an object's bytes.
-	if err := informer.SetTransform(stripCachedObject); err != nil {
+	if err := informer.SetTransform(func(obj any) (any, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return obj, nil
+		}
+		stripCachedObject(u)
+		if w.def.TransformCache != nil {
+			w.def.TransformCache(u)
+		}
+		return u, nil
+	}); err != nil {
 		svc.log.Error("failed to set resource transform", "resource", key, "error", err)
 	}
 	if err := informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) {
@@ -196,18 +206,11 @@ func (svc *Service) expire(key string) {
 
 // stripCachedObject drops fields nothing in Okula reads from every object
 // before it enters an informer cache.
-func stripCachedObject(obj any) (any, error) {
-	u, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return obj, nil
-	}
-
+func stripCachedObject(u *unstructured.Unstructured) {
 	u.SetManagedFields(nil)
 	annotations := u.GetAnnotations()
 	if _, ok := annotations[lastAppliedAnnotation]; ok {
 		delete(annotations, lastAppliedAnnotation)
 		u.SetAnnotations(annotations)
 	}
-
-	return u, nil
 }
