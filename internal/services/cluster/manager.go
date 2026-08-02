@@ -48,6 +48,7 @@ func (svc *Service) setActive(id string) error {
 
 	go svc.heartbeat(heartbeatCtx, conn)
 	svc.startNamespaceInformer(heartbeatCtx, conn)
+	svc.notifyConnectionChanged()
 
 	svc.log.Info("cluster connecting", "id", id, "context", entry.ContextName)
 	return nil
@@ -66,6 +67,7 @@ func (svc *Service) clearActive(persist bool) {
 	}
 	svc.emitClustersUpdated()
 	svc.emitNamespacesUpdated()
+	svc.notifyConnectionChanged()
 }
 
 // teardownLocked cancels the active connection and resets its runtime model.

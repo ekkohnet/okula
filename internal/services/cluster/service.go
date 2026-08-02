@@ -26,9 +26,47 @@ type Service struct {
 	appCtx            context.Context
 	offCatalogUpdated func()
 
-	mu       sync.RWMutex
-	clusters map[string]*ClusterInstanceModel
-	active   *connection
+	mu            sync.RWMutex
+	clusters      map[string]*ClusterInstanceModel
+	active        *connection
+	connListeners []func(*ConnectionHandle)
+}
+
+// OnConnectionChanged registers fn to be called whenever the active
+// connection changes (nil on disconnect). If a connection already exists,
+// fn is invoked immediately with it — connection restore at launch is async
+// and may complete before dependent services register.
+//
+//wails:ignore
+func (svc *Service) OnConnectionChanged(fn func(*ConnectionHandle)) {
+	svc.mu.Lock()
+	svc.connListeners = append(svc.connListeners, fn)
+	var handle *ConnectionHandle
+	if svc.active != nil {
+		handle = svc.active.handle()
+	}
+	svc.mu.Unlock()
+
+	if handle != nil {
+		fn(handle)
+	}
+}
+
+// notifyConnectionChanged invokes registered listeners with the current
+// connection. Must be called without holding svc.mu.
+func (svc *Service) notifyConnectionChanged() {
+	svc.mu.RLock()
+	listeners := make([]func(*ConnectionHandle), len(svc.connListeners))
+	copy(listeners, svc.connListeners)
+	var handle *ConnectionHandle
+	if svc.active != nil {
+		handle = svc.active.handle()
+	}
+	svc.mu.RUnlock()
+
+	for _, fn := range listeners {
+		fn(handle)
+	}
 }
 
 func NewService(args ServiceArgs) *Service {

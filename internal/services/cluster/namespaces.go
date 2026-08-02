@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/ekkohnet/okula/internal/coalesce"
+
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,7 +31,7 @@ func (svc *Service) startNamespaceInformer(ctx context.Context, conn *connection
 		svc.log.Error("failed to set namespace watch error handler", "id", conn.entryID, "error", err)
 	}
 
-	notify := coalesce(ctx, namespacesDebounce, svc.emitNamespacesUpdated)
+	notify := coalesce.New(ctx, namespacesDebounce, svc.emitNamespacesUpdated)
 
 	// Updates don't change the name set, so only adds and deletes notify.
 	if _, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -42,17 +44,4 @@ func (svc *Service) startNamespaceInformer(ctx context.Context, conn *connection
 
 	factory.Start(ctx.Done())
 	svc.log.Info("namespace informer started", "id", conn.entryID)
-}
-
-// coalesce returns a func that schedules fn after delay, resetting the delay
-// on repeated calls. fn never fires after ctx is done.
-func coalesce(ctx context.Context, delay time.Duration, fn func()) func() {
-	timer := time.AfterFunc(delay, func() {
-		if ctx.Err() == nil {
-			fn()
-		}
-	})
-	timer.Stop()
-
-	return func() { timer.Reset(delay) }
 }
