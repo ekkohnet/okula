@@ -2,11 +2,13 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/ekkohnet/okula/internal/services/catalog"
 
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -14,8 +16,10 @@ import (
 )
 
 const (
-	// requestTimeout bounds every client request, including probes.
-	requestTimeout = 10 * time.Second
+	// probeTimeout bounds a single reachability probe. There is deliberately
+	// no rest.Config.Timeout: it would apply to whole requests including
+	// bodies, killing log streams and informer watches mid-flight.
+	probeTimeout = 10 * time.Second
 
 	// clientQPS/clientBurst raise client-go's defaults (5/10), which would
 	// throttle informer startup on larger clusters.
@@ -61,7 +65,6 @@ func newConnection(entry catalog.CatalogEntryModel) (*connection, error) {
 	if err != nil {
 		return nil, fmt.Errorf("build client config for context %q: %w", entry.ContextName, err)
 	}
-	restConfig.Timeout = requestTimeout
 	restConfig.QPS = clientQPS
 	restConfig.Burst = clientBurst
 
@@ -82,11 +85,21 @@ func newConnection(entry catalog.CatalogEntryModel) (*connection, error) {
 	}, nil
 }
 
-// probe checks reachability and returns the server version.
-func (c *connection) probe() (string, error) {
-	info, err := c.clientset.Discovery().ServerVersion()
+// probe checks reachability and returns the server version. It fetches
+// /version directly because Discovery().ServerVersion() takes no context,
+// and the probe must be bounded without a config-wide timeout.
+func (c *connection) probe(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
+	defer cancel()
+
+	body, err := c.clientset.Discovery().RESTClient().Get().AbsPath("/version").Do(ctx).Raw()
 	if err != nil {
 		return "", err
+	}
+
+	var info version.Info
+	if err := json.Unmarshal(body, &info); err != nil {
+		return "", fmt.Errorf("parse server version: %w", err)
 	}
 	return info.GitVersion, nil
 }

@@ -1,7 +1,8 @@
 import { h } from "vue";
 import type { TableColumn, BadgeProps } from "@nuxt/ui";
 
-import { UBadge, TimeAgo } from "#components";
+import { navigateTo } from "#imports";
+import { UBadge, UButton, UTooltip, TimeAgo } from "#components";
 
 import type { ResourceDef, ResourceRow } from "./types";
 
@@ -87,6 +88,23 @@ const columns: TableColumn<PodRow>[] = [
     accessorKey: "createdAt",
     header: "Age",
     cell: ({ row }) => h(TimeAgo, { timestamp: row.original.createdAt }),
+  },
+  {
+    id: "actions",
+    enableHiding: false,
+    enableSorting: false,
+    cell: ({ row }) =>
+      h(UTooltip, { text: "Logs", content: { side: "left" } }, () =>
+        h(UButton, {
+          icon: "i-lucide-scroll-text",
+          color: "neutral",
+          variant: "ghost",
+          class: "ml-auto",
+          "aria-label": "View logs",
+          onClick: () =>
+            navigateTo(`/resources/pods/${row.original.namespace}/${row.original.name}/logs`),
+        }),
+      ),
   },
 ];
 

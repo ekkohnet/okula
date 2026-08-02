@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/ekkohnet/okula/internal/services/cluster"
 
@@ -147,6 +148,11 @@ func (svc *Service) GetPodContainers(ctx context.Context, namespace string, pod 
 	if conn == nil {
 		return PodContainers{}, fmt.Errorf("no active cluster")
 	}
+
+	// The client config has no global timeout (it would kill streams), so
+	// bound this one-shot call here.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 
 	p, err := conn.Clientset.CoreV1().Pods(namespace).Get(ctx, pod, metav1.GetOptions{})
 	if err != nil {

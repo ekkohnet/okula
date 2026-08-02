@@ -117,7 +117,7 @@ func (svc *Service) heartbeat(ctx context.Context, conn *connection) {
 }
 
 func (svc *Service) probeAndUpdate(ctx context.Context, conn *connection) {
-	version, probeErr := conn.probe()
+	version, probeErr := conn.probe(ctx)
 	if ctx.Err() != nil {
 		// Torn down while the probe was in flight; discard the stale result.
 		return
