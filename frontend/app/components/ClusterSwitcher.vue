@@ -6,12 +6,21 @@ import { ClusterStatus } from "#services/cluster/models";
 const { clusters, activeCluster, connectNotify, disconnectNotify } = useClusters();
 
 const open = ref(false);
+const switcherButton = useTemplateRef("switcherButton");
 
 defineShortcuts({
   meta_k: () => {
     open.value = !open.value;
   },
 });
+
+// Refocus the switcher button once the palette has fully closed. Its search
+// input is otherwise unmounted while focused — no blur event fires, Nuxt UI's
+// shortcut engine (useActiveElement) keeps a stale input reference, and every
+// shortcut stays disabled until some other element receives real focus.
+function onPaletteClosed() {
+  switcherButton.value?.$el?.focus?.();
+}
 
 const statusClass = computed(() => {
   switch (activeCluster.value?.status) {
@@ -90,6 +99,7 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => {
 <template>
   <div class="flex items-center gap-2">
     <UButton
+      ref="switcherButton"
       variant="outline"
       color="neutral"
       size="md"
@@ -121,7 +131,7 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => {
       </div>
     </UButton>
 
-    <UModal v-model:open="open" :ui="{ content: 'sm:max-w-4xl' }">
+    <UModal v-model:open="open" :ui="{ content: 'sm:max-w-4xl' }" @after:leave="onPaletteClosed">
       <template #content>
         <UCommandPalette
           :groups="groups"
