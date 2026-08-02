@@ -28,6 +28,8 @@ var definitions = []Definition{
 	replicaSetsDefinition,
 	jobsDefinition,
 	cronJobsDefinition,
+	nodesDefinition,
+	namespacesDefinition,
 }
 
 var registry = func() map[string]Definition {

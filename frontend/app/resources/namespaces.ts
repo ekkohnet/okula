@@ -1,0 +1,38 @@
+import type { TableColumn } from "@nuxt/ui";
+
+import type { ResourceDef, ResourceRow } from "./types";
+import type { Severity } from "./columns";
+import { nameCell, ageCell, severityBadge } from "./columns";
+
+export interface NamespaceRow extends ResourceRow {
+  status: string;
+  statusSeverity: Severity;
+  createdAt: number;
+}
+
+const columns: TableColumn<NamespaceRow>[] = [
+  {
+    id: "name",
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) => nameCell(row.original.name),
+  },
+  {
+    id: "status",
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => severityBadge(row.original.status, row.original.statusSeverity),
+  },
+  {
+    id: "age",
+    accessorKey: "createdAt",
+    header: "Age",
+    cell: ({ row }) => ageCell(row.original.createdAt),
+  },
+];
+
+export const namespacesResource: ResourceDef<NamespaceRow> = {
+  key: "namespaces",
+  namespaced: false,
+  columns,
+};
