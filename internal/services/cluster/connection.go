@@ -38,14 +38,16 @@ type connection struct {
 // ConnectionHandle exposes the active connection to other services (via
 // Service.OnConnectionChanged) without leaking connection internals.
 type ConnectionHandle struct {
-	EntryID string
-	Dynamic dynamic.Interface
+	EntryID   string
+	Dynamic   dynamic.Interface
+	Clientset kubernetes.Interface
 }
 
 func (c *connection) handle() *ConnectionHandle {
 	return &ConnectionHandle{
-		EntryID: c.entryID,
-		Dynamic: c.dynamic,
+		EntryID:   c.entryID,
+		Dynamic:   c.dynamic,
+		Clientset: c.clientset,
 	}
 }
 

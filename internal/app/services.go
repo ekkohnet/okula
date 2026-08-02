@@ -4,6 +4,7 @@ import (
 	"github.com/ekkohnet/okula/internal/services/catalog"
 	"github.com/ekkohnet/okula/internal/services/cluster"
 	"github.com/ekkohnet/okula/internal/services/lifecycle"
+	"github.com/ekkohnet/okula/internal/services/logs"
 	"github.com/ekkohnet/okula/internal/services/resources"
 	"github.com/ekkohnet/okula/internal/services/settings"
 	"github.com/ekkohnet/okula/internal/services/store"
@@ -55,6 +56,13 @@ func (o *Okula) registerServices() {
 		Cluster: clusterSvc,
 	})
 	o.wails.RegisterService(application.NewService(resourcesSvc))
+
+	// Logs Service
+	logsSvc := logs.NewService(logs.ServiceArgs{
+		Log:     o.log,
+		Cluster: clusterSvc,
+	})
+	o.wails.RegisterService(application.NewService(logsSvc))
 
 	// Lifecycle Service
 	lifecycleSvc := lifecycle.NewService(lifecycle.ServiceArgs{
