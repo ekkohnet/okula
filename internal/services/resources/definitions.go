@@ -1,6 +1,7 @@
 package resources
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -21,6 +22,12 @@ type Definition struct {
 
 var definitions = []Definition{
 	podsDefinition,
+	deploymentsDefinition,
+	statefulSetsDefinition,
+	daemonSetsDefinition,
+	replicaSetsDefinition,
+	jobsDefinition,
+	cronJobsDefinition,
 }
 
 var registry = func() map[string]Definition {
@@ -34,4 +41,12 @@ var registry = func() map[string]Definition {
 func definitionFor(key string) (Definition, bool) {
 	def, ok := registry[key]
 	return def, ok
+}
+
+// metaTimeMilli converts an optional metav1.Time to Unix ms, 0 when unset.
+func metaTimeMilli(t *metav1.Time) int64 {
+	if t == nil {
+		return 0
+	}
+	return t.Time.UTC().UnixMilli()
 }

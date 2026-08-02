@@ -1,93 +1,64 @@
 import { h } from "vue";
-import type { TableColumn, BadgeProps } from "@nuxt/ui";
+import type { TableColumn } from "@nuxt/ui";
 
 import { navigateTo } from "#imports";
-import { UBadge, UButton, UTooltip, TimeAgo } from "#components";
+import { UButton, UTooltip } from "#components";
 
 import type { ResourceDef, ResourceRow } from "./types";
+import type { Severity } from "./columns";
+import { nameCell, ageCell, dimZero, textOrDash, severityBadge } from "./columns";
 
 export interface PodRow extends ResourceRow {
   namespace: string;
   ready: string;
   restarts: number;
   status: string;
-  statusSeverity: "ok" | "pending" | "warn" | "error";
+  statusSeverity: Severity;
   qos: string;
   ip: string;
   node: string;
   createdAt: number;
 }
 
-const severityColor: Record<PodRow["statusSeverity"], BadgeProps["color"]> = {
-  ok: "success",
-  pending: "info",
-  warn: "warning",
-  error: "error",
-};
-
 const columns: TableColumn<PodRow>[] = [
   {
     id: "name",
     accessorKey: "name",
     header: "Name",
-    cell: ({ row }) => h("span", { class: "font-medium text-highlighted" }, row.original.name),
+    cell: ({ row }) => nameCell(row.original.name),
   },
-  {
-    id: "namespace",
-    accessorKey: "namespace",
-    header: "Namespace",
-  },
-  {
-    id: "ready",
-    accessorKey: "ready",
-    header: "Ready",
-  },
+  { id: "namespace", accessorKey: "namespace", header: "Namespace" },
+  { id: "ready", accessorKey: "ready", header: "Ready" },
   {
     id: "restarts",
     accessorKey: "restarts",
     header: "Restarts",
-    cell: ({ row }) => {
-      const restarts = row.original.restarts;
-      return restarts === 0 ? h("span", { class: "text-dimmed" }, "0") : String(restarts);
-    },
+    cell: ({ row }) => dimZero(row.original.restarts),
   },
   {
     id: "status",
     accessorKey: "status",
     header: "Status",
-    cell: ({ row }) =>
-      h(
-        UBadge,
-        {
-          color: severityColor[row.original.statusSeverity] ?? "neutral",
-          variant: "subtle",
-          size: "md",
-        },
-        () => row.original.status,
-      ),
+    cell: ({ row }) => severityBadge(row.original.status, row.original.statusSeverity),
   },
-  {
-    id: "qos",
-    accessorKey: "qos",
-    header: "QoS",
-  },
+  { id: "qos", accessorKey: "qos", header: "QoS" },
   {
     id: "ip",
     accessorKey: "ip",
     header: "IP",
-    cell: ({ row }) => row.original.ip || h("span", { class: "text-dimmed" }, "—"),
+    cell: ({ row }) => textOrDash(row.original.ip),
   },
   {
     id: "node",
     accessorKey: "node",
     header: "Node",
-    cell: ({ row }) => row.original.node || h("span", { class: "text-dimmed" }, "—"),
+    cell: ({ row }) => textOrDash(row.original.node),
   },
   {
     id: "age",
     accessorKey: "createdAt",
     header: "Age",
-    cell: ({ row }) => h(TimeAgo, { timestamp: row.original.createdAt }),
+    cell: ({ row }) => ageCell(row.original.createdAt),
   },
   {
     id: "actions",
