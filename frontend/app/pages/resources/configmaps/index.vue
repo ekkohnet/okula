@@ -2,6 +2,7 @@
 import { configMapsResource } from "~/resources/configmaps";
 
 const { rows } = useResource(configMapsResource);
+const { openDetail } = useResourceDetail(configMapsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(configMapsResource);
       :data="rows"
       :columns="configMapsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="configMapsResource" />
   </div>
 </template>

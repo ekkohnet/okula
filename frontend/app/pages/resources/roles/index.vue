@@ -2,6 +2,7 @@
 import { rolesResource } from "~/resources/roles";
 
 const { rows } = useResource(rolesResource);
+const { openDetail } = useResourceDetail(rolesResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(rolesResource);
       :data="rows"
       :columns="rolesResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="rolesResource" />
   </div>
 </template>

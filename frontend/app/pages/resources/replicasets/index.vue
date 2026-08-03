@@ -2,6 +2,7 @@
 import { replicaSetsResource } from "~/resources/replicasets";
 
 const { rows } = useResource(replicaSetsResource);
+const { openDetail } = useResourceDetail(replicaSetsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(replicaSetsResource);
       :data="rows"
       :columns="replicaSetsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="replicaSetsResource" />
   </div>
 </template>

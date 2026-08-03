@@ -2,7 +2,7 @@
 import OrbStackIcon from "../assets/images/orbstack.png";
 
 defineProps<{
-  distro: "EKS" | "AKS" | "Orbstack" | "Kubernetes";
+  distro: string;
 }>();
 </script>
 

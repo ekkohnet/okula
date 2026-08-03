@@ -2,6 +2,7 @@
 import { priorityClassesResource } from "~/resources/priorityclasses";
 
 const { rows } = useResource(priorityClassesResource);
+const { openDetail } = useResourceDetail(priorityClassesResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(priorityClassesResource);
       :data="rows"
       :columns="priorityClassesResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="priorityClassesResource" />
   </div>
 </template>

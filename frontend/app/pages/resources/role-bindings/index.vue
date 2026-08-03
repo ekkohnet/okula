@@ -2,6 +2,7 @@
 import { roleBindingsResource } from "~/resources/rolebindings";
 
 const { rows } = useResource(roleBindingsResource);
+const { openDetail } = useResourceDetail(roleBindingsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(roleBindingsResource);
       :data="rows"
       :columns="roleBindingsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="roleBindingsResource" />
   </div>
 </template>

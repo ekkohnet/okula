@@ -2,6 +2,7 @@
 import { pvsResource } from "~/resources/persistentvolumes";
 
 const { rows } = useResource(pvsResource);
+const { openDetail } = useResourceDetail(pvsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(pvsResource);
       :data="rows"
       :columns="pvsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="pvsResource" />
   </div>
 </template>

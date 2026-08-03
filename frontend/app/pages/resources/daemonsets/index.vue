@@ -2,6 +2,7 @@
 import { daemonSetsResource } from "~/resources/daemonsets";
 
 const { rows } = useResource(daemonSetsResource);
+const { openDetail } = useResourceDetail(daemonSetsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(daemonSetsResource);
       :data="rows"
       :columns="daemonSetsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="daemonSetsResource" />
   </div>
 </template>

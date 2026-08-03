@@ -2,6 +2,7 @@
 import { jobsResource } from "~/resources/jobs";
 
 const { rows } = useResource(jobsResource);
+const { openDetail } = useResourceDetail(jobsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(jobsResource);
       :data="rows"
       :columns="jobsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="jobsResource" />
   </div>
 </template>

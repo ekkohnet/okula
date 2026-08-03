@@ -11,6 +11,28 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
+/**
+ * GetResourceEvents lists events for an object by UID, newest first.
+ * Namespace scopes the list for namespaced objects; pass "" for
+ * cluster-scoped ones, whose events can land in any namespace.
+ */
+export function GetResourceEvents($namespace: string, uid: string): $CancellablePromise<$models.ObjectEvent[] | null> {
+    return $Call.ByID(720638231, $namespace, uid);
+}
+
+/**
+ * GetResourceObject fetches an object live from the cluster. Always a fresh
+ * GET: informer caches are stripped/partial by design, so they can never
+ * back a detail view. Namespace is ignored for cluster-scoped resources.
+ */
+export function GetResourceObject(key: string, $namespace: string, name: string): $CancellablePromise<$models.ObjectDetail> {
+    return $Call.ByID(1215134393, key, $namespace, name);
+}
+
 /**
  * GetResourceRows returns the current projected rows for a resource type.
  * Empty until the informer's initial sync completes; a ResourceUpdated event

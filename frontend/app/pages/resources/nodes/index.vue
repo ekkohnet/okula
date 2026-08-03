@@ -2,6 +2,7 @@
 import { nodesResource } from "~/resources/nodes";
 
 const { rows } = useResource(nodesResource);
+const { openDetail } = useResourceDetail(nodesResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(nodesResource);
       :data="rows"
       :columns="nodesResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="nodesResource" />
   </div>
 </template>

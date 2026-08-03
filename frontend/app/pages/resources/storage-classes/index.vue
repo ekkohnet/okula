@@ -2,6 +2,7 @@
 import { storageClassesResource } from "~/resources/storageclasses";
 
 const { rows } = useResource(storageClassesResource);
+const { openDetail } = useResourceDetail(storageClassesResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(storageClassesResource);
       :data="rows"
       :columns="storageClassesResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="storageClassesResource" />
   </div>
 </template>

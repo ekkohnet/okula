@@ -2,6 +2,7 @@
 import { pdbsResource } from "~/resources/poddisruptionbudgets";
 
 const { rows } = useResource(pdbsResource);
+const { openDetail } = useResourceDetail(pdbsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(pdbsResource);
       :data="rows"
       :columns="pdbsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="pdbsResource" />
   </div>
 </template>

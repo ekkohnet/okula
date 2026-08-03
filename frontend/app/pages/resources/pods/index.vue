@@ -2,6 +2,7 @@
 import { podsResource } from "~/resources/pods";
 
 const { rows } = useResource(podsResource);
+const { openDetail } = useResourceDetail(podsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(podsResource);
       :data="rows"
       :columns="podsResource.columns"
       filter-placeholder="Filter by pod name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="podsResource" />
   </div>
 </template>

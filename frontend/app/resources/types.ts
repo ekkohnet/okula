@@ -1,3 +1,4 @@
+import type { Component } from "vue";
 import type { TableColumn } from "@nuxt/ui";
 
 // Every projected row carries these; the backend projector guarantees them.
@@ -14,4 +15,7 @@ export interface ResourceDef<T extends ResourceRow> {
   key: string;
   namespaced: boolean;
   columns: TableColumn<T>[];
+  // Bespoke summary panel; the generic baseline (ResourceSummary) renders
+  // when absent.
+  summary?: Component;
 }

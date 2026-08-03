@@ -5,3 +5,8 @@ import * as Service from "./service.js";
 export {
     Service
 };
+
+export type {
+    ObjectDetail,
+    ObjectEvent
+} from "./models.js";

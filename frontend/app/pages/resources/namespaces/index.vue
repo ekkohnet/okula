@@ -2,6 +2,7 @@
 import { namespacesResource } from "~/resources/namespaces";
 
 const { rows } = useResource(namespacesResource);
+const { openDetail } = useResourceDetail(namespacesResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(namespacesResource);
       :data="rows"
       :columns="namespacesResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="namespacesResource" />
   </div>
 </template>

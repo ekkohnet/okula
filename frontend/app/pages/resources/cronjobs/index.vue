@@ -2,6 +2,7 @@
 import { cronJobsResource } from "~/resources/cronjobs";
 
 const { rows } = useResource(cronJobsResource);
+const { openDetail } = useResourceDetail(cronJobsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(cronJobsResource);
       :data="rows"
       :columns="cronJobsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="cronJobsResource" />
   </div>
 </template>

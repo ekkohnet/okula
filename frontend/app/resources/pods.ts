@@ -2,7 +2,7 @@ import { h } from "vue";
 import type { TableColumn } from "@nuxt/ui";
 
 import { navigateTo } from "#imports";
-import { UButton, UTooltip } from "#components";
+import { UButton, UTooltip, PodSummary } from "#components";
 
 import type { ResourceDef, ResourceRow } from "./types";
 import type { Severity } from "./columns";
@@ -72,8 +72,11 @@ const columns: TableColumn<PodRow>[] = [
           variant: "ghost",
           class: "ml-auto",
           "aria-label": "View logs",
-          onClick: () =>
-            navigateTo(`/resources/pods/${row.original.namespace}/${row.original.name}/logs`),
+          onClick: (e: MouseEvent) => {
+            // Keep the action from also triggering the row's detail click.
+            e.stopPropagation();
+            navigateTo(`/resources/pods/${row.original.namespace}/${row.original.name}/logs`);
+          },
         }),
       ),
   },
@@ -83,4 +86,5 @@ export const podsResource: ResourceDef<PodRow> = {
   key: "pods",
   namespaced: true,
   columns,
+  summary: PodSummary,
 };

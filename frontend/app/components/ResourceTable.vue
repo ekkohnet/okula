@@ -1,12 +1,15 @@
 <script setup lang="ts" generic="T">
 import { upperFirst } from "scule";
-import type { TableColumn } from "@nuxt/ui";
+import type { TableColumn, TableRow } from "@nuxt/ui";
 
 const props = defineProps<{
   data: T[];
   columns: TableColumn<T>[];
   filterColumn?: string;
   filterPlaceholder?: string;
+  // A prop rather than an emit (Nuxt UI onSelect-style) so its presence can
+  // drive the row cursor affordance. Bind with `@row-click` as usual.
+  onRowClick?: (row: T) => void;
 }>();
 
 const table = useTemplateRef("table");
@@ -70,9 +73,11 @@ const filterColumn = computed(() => props.filterColumn ?? "name");
         class="h-full"
         :ui="{
           separator: 'bg-border',
+          tr: props.onRowClick ? 'cursor-pointer' : '',
           td: 'py-2',
           th: 'bg-elevated/25',
         }"
+        @select="(_e: Event, row: TableRow<T>) => props.onRowClick?.(row.original)"
       />
     </div>
   </div>

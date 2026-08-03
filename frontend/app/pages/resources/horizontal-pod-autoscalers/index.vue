@@ -2,6 +2,7 @@
 import { hpasResource } from "~/resources/horizontalpodautoscalers";
 
 const { rows } = useResource(hpasResource);
+const { openDetail } = useResourceDetail(hpasResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(hpasResource);
       :data="rows"
       :columns="hpasResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="hpasResource" />
   </div>
 </template>

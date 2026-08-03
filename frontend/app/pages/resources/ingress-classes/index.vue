@@ -2,6 +2,7 @@
 import { ingressClassesResource } from "~/resources/ingressclasses";
 
 const { rows } = useResource(ingressClassesResource);
+const { openDetail } = useResourceDetail(ingressClassesResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(ingressClassesResource);
       :data="rows"
       :columns="ingressClassesResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="ingressClassesResource" />
   </div>
 </template>

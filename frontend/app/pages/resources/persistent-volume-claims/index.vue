@@ -2,6 +2,7 @@
 import { pvcsResource } from "~/resources/persistentvolumeclaims";
 
 const { rows } = useResource(pvcsResource);
+const { openDetail } = useResourceDetail(pvcsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(pvcsResource);
       :data="rows"
       :columns="pvcsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="pvcsResource" />
   </div>
 </template>

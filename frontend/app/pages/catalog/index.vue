@@ -15,6 +15,13 @@ const DistroIcon = resolveComponent("CatalogDistroIcon");
 
 const { clusters, connectNotify, disconnectNotify } = useClusters();
 
+const route = useRoute();
+const router = useRouter();
+
+function openDetail(id: string) {
+  router.replace({ query: { ...route.query, detail: id } });
+}
+
 // Ticks "now" so relative Last Seen values stay fresh; sub-minute values
 // render as "just now", so a slow tick is enough.
 const now = ref(Date.now());
@@ -43,6 +50,8 @@ const columns: TableColumn<ClusterInstance>[] = [
         modelValue: row.getIsSelected(),
         "onUpdate:modelValue": (value: boolean | "indeterminate") => row.toggleSelected(!!value),
         "aria-label": "Select row",
+        // Keep selection clicks from also opening the detail panel.
+        onClick: (e: Event) => e.stopPropagation(),
       }),
   },
   {
@@ -113,9 +122,7 @@ const columns: TableColumn<ClusterInstance>[] = [
         {
           label: "Details",
           icon: "i-lucide-panel-right-open",
-          onSelect: () => {
-            slideoverOpen.value = true;
-          },
+          onSelect: () => openDetail(instance.id),
         },
       ];
       return h(UDropdownMenu, { items, content: { align: "end" } }, () =>
@@ -125,6 +132,8 @@ const columns: TableColumn<ClusterInstance>[] = [
           variant: "ghost",
           class: "ml-auto",
           "aria-label": "Actions dropdown",
+          // Keep the trigger click from also opening the detail panel.
+          onClick: (e: Event) => e.stopPropagation(),
         }),
       );
     },
@@ -137,8 +146,6 @@ function onHover(_e: Event, row: TableRow<ClusterInstance> | null) {
 }
 
 const table = useTemplateRef("table");
-
-const slideoverOpen = ref(false);
 </script>
 
 <template>
@@ -203,11 +210,12 @@ const slideoverOpen = ref(false);
           class="h-full"
           :ui="{
             separator: 'bg-border',
-            tr: 'data-[selected=true]:bg-elevated/25',
+            tr: 'data-[selected=true]:bg-elevated/25 cursor-pointer',
             td: 'py-2',
             th: 'bg-elevated/25',
           }"
           @hover="onHover"
+          @select="(_e: Event, row: TableRow<ClusterInstance>) => openDetail(row.original.id)"
         >
           <template #expanded="{ row }">
             <pre>{{ row.original }}</pre>
@@ -221,17 +229,6 @@ const slideoverOpen = ref(false);
       {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} row(s) selected.
     </div> -->
 
-    <USlideover
-      v-model:open="slideoverOpen"
-      title="My Cluster"
-      class="bg-[#131c2c] max-w-2xl"
-      :overlay="false"
-      :dismissible="true"
-      :modal="false"
-    >
-      <template #body>
-        <AppPlaceholder class="h-full" />
-      </template>
-    </USlideover>
+    <CatalogClusterDetail />
   </div>
 </template>

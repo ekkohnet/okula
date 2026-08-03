@@ -2,6 +2,7 @@
 import { statefulSetsResource } from "~/resources/statefulsets";
 
 const { rows } = useResource(statefulSetsResource);
+const { openDetail } = useResourceDetail(statefulSetsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(statefulSetsResource);
       :data="rows"
       :columns="statefulSetsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="statefulSetsResource" />
   </div>
 </template>

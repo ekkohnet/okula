@@ -2,6 +2,7 @@
 import { clusterRoleBindingsResource } from "~/resources/clusterrolebindings";
 
 const { rows } = useResource(clusterRoleBindingsResource);
+const { openDetail } = useResourceDetail(clusterRoleBindingsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(clusterRoleBindingsResource);
       :data="rows"
       :columns="clusterRoleBindingsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="clusterRoleBindingsResource" />
   </div>
 </template>

@@ -2,6 +2,7 @@
 import { serviceAccountsResource } from "~/resources/serviceaccounts";
 
 const { rows } = useResource(serviceAccountsResource);
+const { openDetail } = useResourceDetail(serviceAccountsResource);
 </script>
 
 <template>
@@ -15,6 +16,9 @@ const { rows } = useResource(serviceAccountsResource);
       :data="rows"
       :columns="serviceAccountsResource.columns"
       filter-placeholder="Filter by name..."
+      @row-click="openDetail"
     />
+
+    <ResourceDetail :def="serviceAccountsResource" />
   </div>
 </template>
