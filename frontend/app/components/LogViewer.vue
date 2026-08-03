@@ -13,7 +13,7 @@ const { lines, running, ended, endedError, startError, truncated, start } = useL
 const containers = ref<PodContainers | null>(null);
 const selectedContainer = ref("");
 const previous = ref(false);
-const showTimestamps = ref(false);
+const showTimestamps = ref(true);
 const filter = ref("");
 
 const containerItems = computed(() => {
@@ -112,8 +112,8 @@ watch(lines, async () => {
         aria-label="Container"
       />
 
-      <USwitch v-model="previous" label="Previous" size="sm" />
       <USwitch v-model="showTimestamps" label="Timestamps" size="sm" />
+      <USwitch v-model="previous" label="Previous" size="sm" />
 
       <UInput
         v-model="filter"
@@ -125,8 +125,9 @@ watch(lines, async () => {
 
       <span class="text-xs text-muted whitespace-nowrap">
         {{ visibleLines.length
-        }}<template v-if="filter"> / {{ lines.length }}</template>
-        lines<template v-if="truncated"> (last {{ MAX_LOG_LINES }})</template>
+        }}<template v-if="filter"> / {{ lines.length }}</template> lines<template v-if="truncated">
+          (last {{ MAX_LOG_LINES }})</template
+        >
       </span>
     </div>
 
@@ -136,7 +137,9 @@ watch(lines, async () => {
       class="flex items-center gap-2 px-3 py-2 mb-2 text-sm border border-default rounded-md bg-elevated/25"
     >
       <UIcon name="i-lucide-circle-slash" class="size-4 text-muted shrink-0" />
-      <span>Stream ended<template v-if="endedError">: {{ endedError }}</template></span>
+      <span
+        >Stream ended<template v-if="endedError">: {{ endedError }}</template></span
+      >
       <UButton size="xs" color="neutral" variant="soft" class="ml-auto" @click="restart">
         Resume
       </UButton>
@@ -153,7 +156,7 @@ watch(lines, async () => {
     </div>
 
     <!-- Log pane -->
-    <div class="relative flex-1 min-h-0 border border-default rounded-md">
+    <div class="relative flex-1 min-h-0 border border-default rounded-md bg-gray-950">
       <div
         ref="scrollEl"
         class="h-full overflow-auto font-mono text-xs leading-5 p-3"
@@ -166,7 +169,8 @@ watch(lines, async () => {
         <div v-for="(line, i) in visibleLines" :key="i" class="whitespace-pre w-max min-w-full">
           <span v-if="showTimestamps && line.t" class="text-dimmed select-none mr-3">{{
             formatTime(line.t)
-          }}</span>{{ line.text }}
+          }}</span
+          >{{ line.text }}
         </div>
       </div>
 
