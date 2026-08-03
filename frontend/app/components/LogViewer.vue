@@ -8,7 +8,8 @@ const props = defineProps<{
   container?: string;
 }>();
 
-const { lines, running, ended, endedError, startError, truncated, start } = useLogStream();
+const { lines, running, ended, endedError, startError, truncated, status, statusReason, start } =
+  useLogStream();
 
 const containers = ref<PodContainers | null>(null);
 const selectedContainer = ref("");
@@ -30,8 +31,20 @@ const containerItems = computed(() => {
 const visibleLines = computed(() => {
   const needle = filter.value.trim().toLowerCase();
   if (!needle) return lines.value;
-  return lines.value.filter((line) => line.text.toLowerCase().includes(needle));
+  // A filtered view is a search — markers without their surrounding lines are noise.
+  return lines.value.filter((line) => !line.marker && line.text.toLowerCase().includes(needle));
 });
+
+// Markers are viewer chrome, not log output, so they stay out of the counts.
+const lineCount = computed(() => {
+  let n = 0;
+  for (const line of lines.value) if (!line.marker) n++;
+  return n;
+});
+
+const visibleCount = computed(() =>
+  filter.value.trim() ? visibleLines.value.length : lineCount.value,
+);
 
 const timeFormat = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
@@ -123,9 +136,32 @@ watch(lines, async () => {
         :ui="{ base: 'ring-default', leadingIcon: 'size-4' }"
       />
 
+      <!-- Passive indicator: an auto-resuming stream shouldn't look hung. -->
+      <UBadge
+        v-if="status === 'reconnecting'"
+        color="neutral"
+        variant="soft"
+        size="sm"
+        icon="i-lucide-loader-2"
+        :ui="{ leadingIcon: 'animate-spin' }"
+        class="whitespace-nowrap"
+      >
+        Reconnecting...
+      </UBadge>
+      <UBadge
+        v-else-if="status === 'waiting'"
+        color="warning"
+        variant="soft"
+        size="sm"
+        class="whitespace-nowrap"
+      >
+        Waiting<template v-if="statusReason"> — {{ statusReason }}</template>
+      </UBadge>
+
       <span class="text-xs text-muted whitespace-nowrap">
-        {{ visibleLines.length
-        }}<template v-if="filter"> / {{ lines.length }}</template> lines<template v-if="truncated">
+        {{ visibleCount }}<template v-if="filter"> / {{ lineCount }}</template> lines<template
+          v-if="truncated"
+        >
           (last {{ MAX_LOG_LINES }})</template
         >
       </span>
@@ -166,12 +202,24 @@ watch(lines, async () => {
           {{ running ? "Waiting for logs..." : "No log output." }}
         </div>
 
-        <div v-for="(line, i) in visibleLines" :key="i" class="whitespace-pre w-max min-w-full">
-          <span v-if="showTimestamps && line.t" class="text-dimmed select-none mr-3">{{
-            formatTime(line.t)
-          }}</span
-          >{{ line.text }}
-        </div>
+        <template v-for="(line, i) in visibleLines" :key="i">
+          <!-- Restart divider: no timestamp column, spans the pane rather than the line width. -->
+          <div v-if="line.marker === 'restart'" class="flex items-center gap-3 py-1 select-none">
+            <span class="flex-1 border-t border-default" />
+            <span class="text-dimmed"
+              >container restarted<template v-if="line.exitCode !== undefined">
+                (exit {{ line.exitCode }})</template
+              ></span
+            >
+            <span class="flex-1 border-t border-default" />
+          </div>
+          <div v-else class="whitespace-pre w-max min-w-full">
+            <span v-if="showTimestamps && line.t" class="text-dimmed select-none mr-3">{{
+              formatTime(line.t)
+            }}</span
+            >{{ line.text }}
+          </div>
+        </template>
       </div>
 
       <UButton

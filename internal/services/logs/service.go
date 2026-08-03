@@ -92,8 +92,10 @@ type LogStreamOptions struct {
 }
 
 // StartLogStream begins a streaming session and returns its id. Lines arrive
-// as LogChunk:{id} events; LogStreamEnded:{id} fires when the stream closes
-// for any reason other than an explicit StopLogStream.
+// as LogChunk:{id} events; LogStreamStatus:{id} reports the follow-mode reopen
+// loop (live/reconnecting/waiting, plus restarts); LogStreamEnded:{id} fires
+// when the session is genuinely over — anything other than an explicit
+// StopLogStream.
 func (svc *Service) StartLogStream(ctx context.Context, opts LogStreamOptions) (string, error) {
 	svc.mu.Lock()
 	defer svc.mu.Unlock()

@@ -6,6 +6,23 @@ import { Events } from "@wailsio/runtime";
 export interface LogLine {
   t: number;
   text: string;
+  // Marker entries are viewer-inserted dividers rather than log output; they
+  // live in `lines` so they keep their position in the scroll flow.
+  marker?: "restart";
+  exitCode?: number;
+}
+
+// What the backend reopen loop is doing. Anything but "live" means the stream
+// is between connections rather than tailing.
+export type LogStreamState = "live" | "reconnecting" | "waiting";
+
+// Payload of the per-session LogStreamStatus event. Emitted on transitions,
+// ordered against LogChunk — no generated binding for it yet.
+interface LogStreamStatus {
+  state: LogStreamState;
+  reason?: string;
+  restarted?: boolean;
+  exitCode?: number;
 }
 
 export interface LogStreamStart {
@@ -29,10 +46,13 @@ export function useLogStream() {
   const endedError = ref<string | null>(null);
   const startError = ref<string | null>(null);
   const truncated = ref(false);
+  const status = ref<LogStreamState>("live");
+  const statusReason = ref<string | null>(null);
 
   let sessionId: string | null = null;
   let offChunk: (() => void) | null = null;
   let offEnded: (() => void) | null = null;
+  let offStatus: (() => void) | null = null;
   let generation = 0;
 
   function append(newLines: LogLine[]) {
@@ -46,12 +66,21 @@ export function useLogStream() {
     lines.value = next;
   }
 
+  // Status describes a running stream only; anything else is idle.
+  function clearStatus() {
+    status.value = "live";
+    statusReason.value = null;
+  }
+
   async function stop() {
     offChunk?.();
     offChunk = null;
     offEnded?.();
     offEnded = null;
+    offStatus?.();
+    offStatus = null;
     running.value = false;
+    clearStatus();
 
     if (sessionId) {
       const id = sessionId;
@@ -71,6 +100,7 @@ export function useLogStream() {
     ended.value = false;
     endedError.value = null;
     startError.value = null;
+    clearStatus();
 
     let id: string;
     try {
@@ -105,6 +135,19 @@ export function useLogStream() {
       ended.value = true;
       endedError.value = payload?.error || null;
       running.value = false;
+      clearStatus();
+    });
+    offStatus = Events.On(`LogStreamStatus:${id}`, (ev) => {
+      const payload: LogStreamStatus | undefined = ev?.data ?? ev;
+      if (!payload) return;
+
+      // Insert the divider where the event lands: between the old container's
+      // last lines and whatever the reopened stream sends next.
+      if (payload.restarted) {
+        append([{ t: Date.now(), text: "", marker: "restart", exitCode: payload.exitCode }]);
+      }
+      status.value = payload.state ?? "live";
+      statusReason.value = payload.reason || null;
     });
   }
 
@@ -112,5 +155,16 @@ export function useLogStream() {
     stop();
   });
 
-  return { lines, running, ended, endedError, startError, truncated, start, stop };
+  return {
+    lines,
+    running,
+    ended,
+    endedError,
+    startError,
+    truncated,
+    status,
+    statusReason,
+    start,
+    stop,
+  };
 }
