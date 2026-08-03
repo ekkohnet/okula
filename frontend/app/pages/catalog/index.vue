@@ -118,17 +118,14 @@ const columns: TableColumn<ClusterInstance>[] = [
           },
         },
       ];
-      return h(
-        UDropdownMenu,
-        { items, content: { align: "end" } },
-        () =>
-          h(UButton, {
-            icon: "i-lucide-ellipsis-vertical",
-            color: "neutral",
-            variant: "ghost",
-            class: "ml-auto",
-            "aria-label": "Actions dropdown",
-          }),
+      return h(UDropdownMenu, { items, content: { align: "end" } }, () =>
+        h(UButton, {
+          icon: "i-lucide-ellipsis-vertical",
+          color: "neutral",
+          variant: "ghost",
+          class: "ml-auto",
+          "aria-label": "Actions dropdown",
+        }),
       );
     },
   },
@@ -208,6 +205,7 @@ const slideoverOpen = ref(false);
             separator: 'bg-border',
             tr: 'data-[selected=true]:bg-elevated/25',
             td: 'py-2',
+            th: 'bg-elevated/25',
           }"
           @hover="onHover"
         >

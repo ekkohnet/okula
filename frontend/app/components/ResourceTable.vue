@@ -71,6 +71,7 @@ const filterColumn = computed(() => props.filterColumn ?? "name");
         :ui="{
           separator: 'bg-border',
           td: 'py-2',
+          th: 'bg-elevated/25',
         }"
       />
     </div>
