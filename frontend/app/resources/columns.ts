@@ -21,7 +21,7 @@ export function severityBadge(status: string, severity: Severity): VNode {
     {
       color: severityColor[severity] ?? "neutral",
       variant: "soft",
-      size: "md",
+      size: "sm",
     },
     () => status,
   );

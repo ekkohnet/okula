@@ -34,7 +34,7 @@ const open = computed({
     v-model:open="open"
     :title="instance?.entry.shortName || instance?.entry.contextName"
     :description="instance?.entry.contextName"
-    class="max-w-2xl"
+    class="max-w-2xl bg-[#131D2C]"
     :overlay="false"
     :modal="false"
     dismissible
@@ -72,10 +72,7 @@ const open = computed({
           <TimeAgo :timestamp="instance.lastSeen ?? instance.entry.lastSeen" />
 
           <span class="text-muted">Kubeconfig</span>
-          <span
-            class="font-mono text-xs/5 truncate"
-            :title="instance.entry.kubeconfigPath"
-          >
+          <span class="font-mono text-xs/5 truncate" :title="instance.entry.kubeconfigPath">
             {{ instance.entry.kubeconfigPath }}
           </span>
         </div>
@@ -99,12 +96,7 @@ const open = computed({
         variant="soft"
         @click="disconnectNotify()"
       />
-      <UButton
-        v-else
-        label="Connect"
-        icon="i-lucide-plug"
-        @click="connectNotify(instance.id)"
-      />
+      <UButton v-else label="Connect" icon="i-lucide-plug" @click="connectNotify(instance.id)" />
     </template>
   </USlideover>
 </template>

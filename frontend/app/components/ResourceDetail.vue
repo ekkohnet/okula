@@ -84,7 +84,7 @@ watch(
     v-model:open="open"
     :title="target?.name"
     :description="def.namespaced ? target?.namespace : undefined"
-    class="max-w-3xl"
+    class="max-w-7xl bg-[#131D2C]"
     :overlay="false"
     :modal="false"
     dismissible
@@ -111,7 +111,11 @@ watch(
           <div v-if="loading && !detail" class="flex justify-center pt-12">
             <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-dimmed" />
           </div>
-          <component :is="def.summary ?? ResourceSummary" v-else-if="detail" :object="detail.object" />
+          <component
+            :is="def.summary ?? ResourceSummary"
+            v-else-if="detail"
+            :object="detail.object"
+          />
         </div>
 
         <div v-else-if="tab === 'events'" class="flex-1 min-h-0 overflow-y-auto mt-3">

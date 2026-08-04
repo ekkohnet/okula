@@ -23,7 +23,7 @@ const statusColor = computed(() => {
 </script>
 
 <template>
-  <UBadge :color="statusColor" size="md" variant="subtle">
+  <UBadge :color="statusColor" size="md" variant="soft">
     {{ props.status }}
   </UBadge>
 </template>

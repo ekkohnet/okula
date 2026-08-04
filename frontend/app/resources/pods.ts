@@ -70,7 +70,7 @@ const columns: TableColumn<PodRow>[] = [
           icon: "i-lucide-scroll-text",
           color: "neutral",
           variant: "ghost",
-          class: "ml-auto",
+          class: "ml-auto size-5",
           "aria-label": "View logs",
           onClick: (e: MouseEvent) => {
             // Keep the action from also triggering the row's detail click.

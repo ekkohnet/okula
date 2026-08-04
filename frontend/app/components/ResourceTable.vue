@@ -75,7 +75,7 @@ const filterColumn = computed(() => props.filterColumn ?? "name");
           separator: 'bg-border',
           tr: props.onRowClick ? 'cursor-pointer' : '',
           td: 'py-2',
-          th: 'bg-elevated/25',
+          th: 'bg-[#131D2C]',
         }"
         @select="(_e: Event, row: TableRow<T>) => props.onRowClick?.(row.original)"
       />
