@@ -150,7 +150,7 @@ const resourceNavItems = [
   {
     label: "Configuration",
     icon: "i-lucide-file-sliders",
-    open: false,
+    open: true,
     children: [
       {
         label: "ConfigMaps",
