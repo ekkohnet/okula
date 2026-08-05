@@ -213,6 +213,16 @@ const resourceNavItems = [
   },
 ] satisfies NavigationMenuItem[];
 
+// Temporary entry point for the /design mock pages (ui-redesign.md);
+// remove with them. Not cluster-gated — the mocks are static.
+const designNavItems = [
+  {
+    label: "Design Mocks",
+    icon: "i-lucide-pencil-ruler",
+    to: "/design/pod",
+  },
+] satisfies NavigationMenuItem[];
+
 // Cluster-scoped links disable without an active cluster; collapsible group
 // headings stay usable so the nav can still be explored.
 const navLinks = computed<NavigationMenuItem[]>(() =>
@@ -251,6 +261,8 @@ const namespaceItems = computed(() => [ALL_NAMESPACES, ...namespaces.value]);
         <UNavigationMenu :items="navLinks" orientation="vertical" tooltip popover />
         <USeparator />
         <UNavigationMenu :items="resourceLinks" orientation="vertical" highlight tooltip popover />
+        <USeparator />
+        <UNavigationMenu :items="designNavItems" orientation="vertical" tooltip popover />
       </template>
 
       <template #footer>
