@@ -58,63 +58,25 @@ const metricSeries = computed(() => {
   };
 });
 
-// Copy gives feedback in place: the icon flips to a check briefly.
-const copied = ref(false);
-let copyTimer: ReturnType<typeof setTimeout> | undefined;
-async function copyName() {
-  await navigator.clipboard.writeText(pod.value.name);
-  copied.value = true;
-  clearTimeout(copyTimer);
-  copyTimer = setTimeout(() => (copied.value = false), 1500);
-}
 </script>
 
 <template>
   <div class="h-full min-h-0 flex flex-col px-3">
-    <!-- Page header: the PageHeader pattern under design -->
-    <div class="flex items-center gap-3 mb-8 shrink-0">
-      <UTooltip text="Back">
-        <UButton
-          icon="i-lucide-arrow-left"
-          color="neutral"
-          variant="ghost"
-          aria-label="Back"
-          @click="navigateTo('/resources/pods')"
-        />
-      </UTooltip>
-      <div class="min-w-0">
-        <div class="flex items-center gap-1.5 min-w-0">
-          <h1 class="text-2xl font-semibold truncate" :title="pod.name">{{ pod.name }}</h1>
-          <UTooltip :text="copied ? 'Copied' : 'Copy name'">
-            <UButton
-              :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'"
-              color="neutral"
-              variant="ghost"
-              size="xs"
-              square
-              aria-label="Copy name"
-              class="shrink-0"
-              @click="copyName"
-            />
-          </UTooltip>
-        </div>
-        <p class="text-sm text-muted">
-          <ULink raw to="/resources/pods" class="hover:text-highlighted transition-colors">
-            Pods
-          </ULink>
-          <span class="text-dimmed mx-1">/</span>
-          <span>{{ pod.namespace }}</span>
-        </p>
-      </div>
-
-      <div class="flex items-center gap-2 ml-auto shrink-0">
+    <PageHeader
+      :title="pod.name"
+      copy-title
+      :breadcrumb="[{ label: 'Pods', to: '/resources/pods' }, { label: pod.namespace }]"
+      back-fallback="/resources/pods"
+    >
+      <template #actions>
         <UButton icon="i-lucide-terminal" color="neutral" variant="soft">Shell</UButton>
         <UButton icon="i-lucide-scroll-text" color="neutral" variant="soft">Logs</UButton>
         <UButton icon="i-lucide-files" color="neutral" variant="soft">Files</UButton>
         <UButton icon="i-lucide-file-code" color="neutral" variant="soft">Manifest</UButton>
         <UButton icon="i-lucide-trash-2" color="error" variant="soft">Delete</UButton>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
+
 
     <div class="flex-1 min-h-0 overflow-y-auto">
       <!-- Status strip: primary status row, identity row below -->

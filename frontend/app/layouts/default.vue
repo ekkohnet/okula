@@ -300,16 +300,6 @@ const namespaceItems = computed(() => [ALL_NAMESPACES, ...namespaces.value]);
               }"
             />
 
-            <!-- <USeparator orientation="vertical" class="h-8 ml-5" /> -->
-
-            <!-- <UTooltip text="Go Back" class="ml-1" :content="{ side: 'right' }">
-              <UButton color="neutral" variant="ghost" square>
-                <UIcon name="i-lucide-arrow-left" class="size-6 shrink-0" />
-              </UButton>
-            </UTooltip>
-
-            <USeparator orientation="vertical" class="h-8 ml-1" /> -->
-
             <UTooltip text="Notifications" :shortcuts="['N']" class="ml-4">
               <UButton color="neutral" variant="ghost" square>
                 <UIcon name="i-lucide-bell" class="size-5 shrink-0" />
