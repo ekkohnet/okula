@@ -9,6 +9,7 @@ const props = defineProps<{
 
 const { rows } = useResource(props.def);
 const { openDetail } = useResourceDetail(props.def);
+const { columnFilters, columnVisibility, sorting, scrollTop } = useListState(props.def);
 </script>
 
 <template>
@@ -21,7 +22,15 @@ const { openDetail } = useResourceDetail(props.def);
       </p>
     </div>
 
-    <ResourceTable :data="rows" :columns="def.columns" @row-click="openDetail" />
+    <ResourceTable
+      v-model:column-filters="columnFilters"
+      v-model:column-visibility="columnVisibility"
+      v-model:sorting="sorting"
+      v-model:scroll-top="scrollTop"
+      :data="rows"
+      :columns="def.columns"
+      @row-click="openDetail"
+    />
 
     <ResourceDetail :def="def" />
   </div>
