@@ -57,7 +57,6 @@ const metricSeries = computed(() => {
     })),
   };
 });
-
 </script>
 
 <template>
@@ -76,7 +75,6 @@ const metricSeries = computed(() => {
         <UButton icon="i-lucide-trash-2" color="error" variant="soft">Delete</UButton>
       </template>
     </PageHeader>
-
 
     <div class="flex-1 min-h-0 overflow-y-auto">
       <!-- Status strip: primary status row, identity row below -->

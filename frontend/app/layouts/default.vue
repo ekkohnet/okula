@@ -217,9 +217,14 @@ const resourceNavItems = [
 // remove with them. Not cluster-gated — the mocks are static.
 const designNavItems = [
   {
-    label: "Design Mocks",
+    label: "Pod Page",
     icon: "i-lucide-pencil-ruler",
     to: "/design/pod",
+  },
+  {
+    label: "List Page",
+    icon: "i-lucide-pencil-ruler",
+    to: "/design/list",
   },
 ] satisfies NavigationMenuItem[];
 
