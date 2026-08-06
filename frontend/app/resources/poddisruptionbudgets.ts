@@ -47,6 +47,8 @@ const columns: TableColumn<PDBRow>[] = [
 
 export const pdbsResource: ResourceDef<PDBRow> = {
   key: "poddisruptionbudgets",
+  title: "Pod Disruption Budgets",
+  noun: "budgets",
   namespaced: true,
   columns,
 };

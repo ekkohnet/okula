@@ -52,6 +52,8 @@ const columns: TableColumn<JobRow>[] = [
 
 export const jobsResource: ResourceDef<JobRow> = {
   key: "jobs",
+  title: "Jobs",
+  noun: "jobs",
   namespaced: true,
   columns,
 };

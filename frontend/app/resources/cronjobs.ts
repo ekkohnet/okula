@@ -53,6 +53,8 @@ const columns: TableColumn<CronJobRow>[] = [
 
 export const cronJobsResource: ResourceDef<CronJobRow> = {
   key: "cronjobs",
+  title: "CronJobs",
+  noun: "cronjobs",
   namespaced: true,
   columns,
 };

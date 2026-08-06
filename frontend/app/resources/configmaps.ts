@@ -33,6 +33,8 @@ const columns: TableColumn<ConfigMapRow>[] = [
 
 export const configMapsResource: ResourceDef<ConfigMapRow> = {
   key: "configmaps",
+  title: "ConfigMaps",
+  noun: "configmaps",
   namespaced: true,
   columns,
 };

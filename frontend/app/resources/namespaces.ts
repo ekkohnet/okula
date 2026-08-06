@@ -33,6 +33,8 @@ const columns: TableColumn<NamespaceRow>[] = [
 
 export const namespacesResource: ResourceDef<NamespaceRow> = {
   key: "namespaces",
+  title: "Namespaces",
+  noun: "namespaces",
   namespaced: false,
   columns,
 };

@@ -38,6 +38,8 @@ const columns: TableColumn<ClusterRoleBindingRow>[] = [
 
 export const clusterRoleBindingsResource: ResourceDef<ClusterRoleBindingRow> = {
   key: "clusterrolebindings",
+  title: "Cluster Role Bindings",
+  noun: "cluster role bindings",
   namespaced: false,
   columns,
 };

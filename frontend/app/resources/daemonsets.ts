@@ -36,6 +36,8 @@ const columns: TableColumn<DaemonSetRow>[] = [
 
 export const daemonSetsResource: ResourceDef<DaemonSetRow> = {
   key: "daemonsets",
+  title: "DaemonSets",
+  noun: "daemonsets",
   namespaced: true,
   columns,
 };

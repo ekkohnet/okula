@@ -31,6 +31,8 @@ const columns: TableColumn<ClusterRoleRow>[] = [
 
 export const clusterRolesResource: ResourceDef<ClusterRoleRow> = {
   key: "clusterroles",
+  title: "Cluster Roles",
+  noun: "cluster roles",
   namespaced: false,
   columns,
 };

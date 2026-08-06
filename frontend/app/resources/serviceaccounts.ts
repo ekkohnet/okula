@@ -33,6 +33,8 @@ const columns: TableColumn<ServiceAccountRow>[] = [
 
 export const serviceAccountsResource: ResourceDef<ServiceAccountRow> = {
   key: "serviceaccounts",
+  title: "Service Accounts",
+  noun: "service accounts",
   namespaced: true,
   columns,
 };

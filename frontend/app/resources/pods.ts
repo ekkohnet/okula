@@ -84,6 +84,8 @@ const columns: TableColumn<PodRow>[] = [
 
 export const podsResource: ResourceDef<PodRow> = {
   key: "pods",
+  title: "Pods",
+  noun: "pods",
   namespaced: true,
   columns,
   summary: PodSummary,

@@ -63,6 +63,8 @@ const columns: TableColumn<PVCRow>[] = [
 
 export const pvcsResource: ResourceDef<PVCRow> = {
   key: "persistentvolumeclaims",
+  title: "Persistent Volume Claims",
+  noun: "claims",
   namespaced: true,
   columns,
 };

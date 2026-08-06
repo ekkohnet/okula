@@ -56,6 +56,8 @@ const columns: TableColumn<NodeRow>[] = [
 
 export const nodesResource: ResourceDef<NodeRow> = {
   key: "nodes",
+  title: "Nodes",
+  noun: "nodes",
   namespaced: false,
   columns,
 };

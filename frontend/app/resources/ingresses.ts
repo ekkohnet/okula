@@ -49,6 +49,8 @@ const columns: TableColumn<IngressRow>[] = [
 
 export const ingressesResource: ResourceDef<IngressRow> = {
   key: "ingresses",
+  title: "Ingresses",
+  noun: "ingresses",
   namespaced: true,
   columns,
 };

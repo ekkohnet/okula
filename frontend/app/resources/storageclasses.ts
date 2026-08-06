@@ -42,6 +42,8 @@ const columns: TableColumn<StorageClassRow>[] = [
 
 export const storageClassesResource: ResourceDef<StorageClassRow> = {
   key: "storageclasses",
+  title: "Storage Classes",
+  noun: "storage classes",
   namespaced: false,
   columns,
 };

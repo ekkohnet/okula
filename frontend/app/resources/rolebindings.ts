@@ -40,6 +40,8 @@ const columns: TableColumn<RoleBindingRow>[] = [
 
 export const roleBindingsResource: ResourceDef<RoleBindingRow> = {
   key: "rolebindings",
+  title: "Role Bindings",
+  noun: "role bindings",
   namespaced: true,
   columns,
 };

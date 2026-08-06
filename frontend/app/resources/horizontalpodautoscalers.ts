@@ -41,6 +41,8 @@ const columns: TableColumn<HPARow>[] = [
 
 export const hpasResource: ResourceDef<HPARow> = {
   key: "horizontalpodautoscalers",
+  title: "Horizontal Pod Autoscalers",
+  noun: "autoscalers",
   namespaced: true,
   columns,
 };

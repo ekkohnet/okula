@@ -47,6 +47,8 @@ const columns: TableColumn<ReplicaSetRow>[] = [
 
 export const replicaSetsResource: ResourceDef<ReplicaSetRow> = {
   key: "replicasets",
+  title: "ReplicaSets",
+  noun: "replicasets",
   namespaced: true,
   columns,
 };

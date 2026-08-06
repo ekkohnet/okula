@@ -33,6 +33,8 @@ const columns: TableColumn<PriorityClassRow>[] = [
 
 export const priorityClassesResource: ResourceDef<PriorityClassRow> = {
   key: "priorityclasses",
+  title: "Priority Classes",
+  noun: "priority classes",
   namespaced: false,
   columns,
 };

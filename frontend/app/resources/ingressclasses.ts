@@ -33,6 +33,8 @@ const columns: TableColumn<IngressClassRow>[] = [
 
 export const ingressClassesResource: ResourceDef<IngressClassRow> = {
   key: "ingressclasses",
+  title: "Ingress Classes",
+  noun: "ingress classes",
   namespaced: false,
   columns,
 };

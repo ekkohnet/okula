@@ -28,6 +28,8 @@ const columns: TableColumn<StatefulSetRow>[] = [
 
 export const statefulSetsResource: ResourceDef<StatefulSetRow> = {
   key: "statefulsets",
+  title: "StatefulSets",
+  noun: "statefulsets",
   namespaced: true,
   columns,
 };

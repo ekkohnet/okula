@@ -40,6 +40,8 @@ const columns: TableColumn<SecretRow>[] = [
 
 export const secretsResource: ResourceDef<SecretRow> = {
   key: "secrets",
+  title: "Secrets",
+  noun: "secrets",
   namespaced: true,
   columns,
 };

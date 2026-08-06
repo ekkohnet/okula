@@ -32,6 +32,8 @@ const columns: TableColumn<DeploymentRow>[] = [
 
 export const deploymentsResource: ResourceDef<DeploymentRow> = {
   key: "deployments",
+  title: "Deployments",
+  noun: "deployments",
   namespaced: true,
   columns,
 };

@@ -63,6 +63,8 @@ const columns: TableColumn<PVRow>[] = [
 
 export const pvsResource: ResourceDef<PVRow> = {
   key: "persistentvolumes",
+  title: "Persistent Volumes",
+  noun: "volumes",
   namespaced: false,
   columns,
 };

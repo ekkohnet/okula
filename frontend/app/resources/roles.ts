@@ -33,6 +33,8 @@ const columns: TableColumn<RoleRow>[] = [
 
 export const rolesResource: ResourceDef<RoleRow> = {
   key: "roles",
+  title: "Roles",
+  noun: "roles",
   namespaced: true,
   columns,
 };
