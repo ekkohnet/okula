@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AnyResourceDef } from "~/resources/types";
+import type { AnyResourceDef, ResourceRow } from "~/resources/types";
 
 // The uniform list view behind every /resources/[kind] route; replaces the
 // former per-kind page files.
@@ -8,8 +8,18 @@ const props = defineProps<{
 }>();
 
 const { rows } = useResource(props.def);
-const { openDetail } = useResourceDetail(props.def);
 const { columnFilters, columnVisibility, sorting, scrollTop } = useListState(props.def);
+
+const route = useRoute();
+
+function openDetail(row: ResourceRow) {
+  const kind = String(route.params.kind);
+  navigateTo(
+    props.def.namespaced
+      ? `/resources/${kind}/${row.namespace}/${row.name}`
+      : `/resources/${kind}/${row.name}`,
+  );
+}
 </script>
 
 <template>
@@ -31,7 +41,5 @@ const { columnFilters, columnVisibility, sorting, scrollTop } = useListState(pro
       :columns="def.columns"
       @row-click="openDetail"
     />
-
-    <ResourceDetail :def="def" />
   </div>
 </template>
