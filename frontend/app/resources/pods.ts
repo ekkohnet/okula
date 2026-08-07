@@ -2,7 +2,7 @@ import { h } from "vue";
 import type { TableColumn } from "@nuxt/ui";
 
 import { navigateTo } from "#imports";
-import { UButton, UTooltip, PodDetail } from "#components";
+import { UButton, PodDetail } from "#components";
 
 import type { ResourceDef, ResourceRow } from "./types";
 import type { Severity } from "./columns";
@@ -65,21 +65,22 @@ const columns: TableColumn<PodRow>[] = [
     enableHiding: false,
     enableSorting: false,
     cell: ({ row }) =>
-      h(UTooltip, { text: "Logs", content: { side: "left" } }, () =>
-        h(UButton, {
-          icon: "i-lucide-scroll-text",
-          color: "neutral",
-          variant: "ghost",
-          // Revealed by row hover; the tr carries the group class.
-          class: "ml-auto size-5 opacity-0 group-hover:opacity-100 transition-opacity",
-          "aria-label": "View logs",
-          onClick: (e: MouseEvent) => {
-            // Keep the action from also triggering the row's detail click.
-            e.stopPropagation();
-            navigateTo(`/resources/pods/${row.original.namespace}/${row.original.name}/logs`);
-          },
-        }),
-      ),
+      // Native title, not UTooltip: a tooltip component instance per row is
+      // real mount cost at cluster scale (perf pass, 2026-08-07).
+      h(UButton, {
+        icon: "i-lucide-scroll-text",
+        color: "neutral",
+        variant: "ghost",
+        // Revealed by row hover; the tr carries the group class.
+        class: "ml-auto size-5 opacity-0 group-hover:opacity-100 transition-opacity",
+        "aria-label": "View logs",
+        title: "Logs",
+        onClick: (e: MouseEvent) => {
+          // Keep the action from also triggering the row's detail click.
+          e.stopPropagation();
+          navigateTo(`/resources/pods/${row.original.namespace}/${row.original.name}/logs`);
+        },
+      }),
   },
 ];
 

@@ -8,8 +8,6 @@
 // localStorage.okulaPerf = "1". Measures also land on the Performance
 // timeline (devtools) for profiling correlation.
 export default defineNuxtPlugin(() => {
-  const enabled = () => import.meta.dev || localStorage.getItem("okulaPerf") === "1";
-
   const router = useRouter();
   let navStart = 0;
   let from = "";
@@ -33,7 +31,7 @@ export default defineNuxtPlugin(() => {
       requestAnimationFrame(() => {
         const painted = performance.now();
         performance.measure(`nav ${from} → ${to}`, { start, end: painted });
-        if (!enabled()) return;
+        if (!perfEnabled()) return;
         console.debug(
           `[perf] nav ${from} → ${to}: resolve ${(resolved - start).toFixed(0)}ms, ` +
             `render+paint ${(painted - resolved).toFixed(0)}ms`,

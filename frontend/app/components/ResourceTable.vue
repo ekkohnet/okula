@@ -40,13 +40,44 @@ const filterValue = computed({
   },
 });
 
+// Rows mount one frame after arrival: the navigation frame paints the
+// page chrome only, so the click always responds instantly and the row
+// render cost lands behind the table's loading bar instead of blocking
+// the route change. Double rAF because the first callback still runs
+// before the arrival frame's paint.
+const rowsReady = ref(false);
+
 // UTable's root is the scroll container (overflow-auto in its theme), so
-// scroll survival reads and restores the component's root element.
-onMounted(async () => {
-  if (!scrollTop.value) return;
-  await nextTick();
-  const el = table.value?.$el as HTMLElement | undefined;
-  if (el) el.scrollTop = scrollTop.value;
+// scroll survival reads and restores the component's root element —
+// after the deferred rows exist, or the restore would clamp to zero.
+// Both run pre-paint of the rows' frame, so nothing visibly jumps.
+onMounted(() => {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
+      // Fill = the deferred mount of the rows already in session state;
+      // rows that arrive later from a fetch land outside this window.
+      const fillStart = performance.now();
+      rowsReady.value = true;
+      await nextTick();
+      if (scrollTop.value) {
+        const el = table.value?.$el as HTMLElement | undefined;
+        if (el) el.scrollTop = scrollTop.value;
+      }
+      // This rAF fires after the rows' frame has painted.
+      requestAnimationFrame(() => {
+        const filled = performance.now();
+        performance.measure(`table fill (${props.data.length} rows)`, {
+          start: fillStart,
+          end: filled,
+        });
+        if (perfEnabled()) {
+          console.debug(
+            `[perf] table fill: ${props.data.length} rows in ${(filled - fillStart).toFixed(0)}ms`,
+          );
+        }
+      });
+    });
+  });
 });
 
 onBeforeUnmount(() => {
@@ -112,9 +143,9 @@ onBeforeUnmount(() => {
       v-model:column-filters="columnFilters"
       v-model:column-visibility="columnVisibility"
       v-model:sorting="sorting"
-      :data="data"
+      :data="rowsReady ? data : []"
       :columns="columns"
-      :loading="loading"
+      :loading="loading || !rowsReady"
       loading-animation="swing"
       sticky
       class="h-full"
