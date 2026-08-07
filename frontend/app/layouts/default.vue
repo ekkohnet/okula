@@ -221,11 +221,6 @@ const designNavItems = [
     icon: "i-lucide-pencil-ruler",
     to: "/design/pod",
   },
-  {
-    label: "List Page",
-    icon: "i-lucide-pencil-ruler",
-    to: "/design/list",
-  },
 ] satisfies NavigationMenuItem[];
 
 // Cluster-scoped links disable without an active cluster; collapsible group
