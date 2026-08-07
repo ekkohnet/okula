@@ -245,7 +245,7 @@ const namespaceItems = computed(() => [ALL_NAMESPACES, ...namespaces.value]);
   <UDashboardGroup unit="rem">
     <UDashboardSidebar
       id="default"
-      class="bg-elevated/25"
+      class="bg-elevated-flat"
       :default-size="19"
       :ui="{
         header: 'border-b border-default pt-26 pb-15',
