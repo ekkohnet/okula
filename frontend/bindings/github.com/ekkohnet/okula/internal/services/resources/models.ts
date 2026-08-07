@@ -36,3 +36,13 @@ export interface ObjectEvent {
     "lastSeen": number;
     "source": string;
 }
+
+/**
+ * RowsSnapshot is the rows payload plus whether the informer behind it has
+ * completed its initial sync. Pre-sync snapshots are partial: views must
+ * not treat them as the truth, nor as an empty result.
+ */
+export interface RowsSnapshot {
+    "synced": boolean;
+    "rows": ({ [_ in string]?: any } | null)[] | null;
+}

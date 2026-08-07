@@ -8,5 +8,6 @@ export {
 
 export type {
     ObjectDetail,
-    ObjectEvent
+    ObjectEvent,
+    RowsSnapshot
 } from "./models.js";

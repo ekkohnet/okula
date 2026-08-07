@@ -7,7 +7,7 @@ const props = defineProps<{
   def: AnyResourceDef;
 }>();
 
-const { rows } = useResource(props.def);
+const { rows, synced } = useResource(props.def);
 const { columnFilters, columnVisibility, sorting, scrollTop } = useListState(props.def);
 
 const route = useRoute();
@@ -47,7 +47,11 @@ const emptyMessage = computed(() =>
     namespace context lives in the navbar selector. -->
     <div class="flex items-baseline gap-2.5 shrink-0">
       <h1 class="text-2xl font-semibold">{{ def.title }}</h1>
-      <span class="text-sm text-muted">{{ visibleCount }}</span>
+      <!-- No count until it means something: invisible pre-sync unless
+      cached rows are already showing. -->
+      <span class="text-sm text-muted" :class="synced || rows.length ? '' : 'invisible'">
+        {{ visibleCount }}
+      </span>
     </div>
 
     <ResourceTable
@@ -57,13 +61,18 @@ const emptyMessage = computed(() =>
       v-model:scroll-top="scrollTop"
       :data="rows"
       :columns="def.columns"
+      :loading="!synced && !rows.length"
       @row-click="openDetail"
     >
       <template #empty>
-        <div class="flex flex-col items-center gap-2 py-16">
+        <!-- The empty message renders only once the source has synced —
+        pre-sync, the table's loading indicator carries the state and the
+        body stays blank at the same height (no jump at the swap). -->
+        <div v-if="synced" class="flex flex-col items-center gap-2 py-16">
           <UIcon name="i-lucide-inbox" class="size-6 text-dimmed" />
           <p class="text-sm text-dimmed">{{ emptyMessage }}</p>
         </div>
+        <div v-else class="py-16" />
       </template>
     </ResourceTable>
   </div>

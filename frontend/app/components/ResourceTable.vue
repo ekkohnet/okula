@@ -6,6 +6,9 @@ import type { ColumnFiltersState, SortingState, VisibilityState } from "@tanstac
 const props = defineProps<{
   data: T[];
   columns: TableColumn<T>[];
+  // Renders UTable's animated indicator under the header while the data
+  // source is still syncing and there is nothing to show.
+  loading?: boolean;
   filterColumn?: string;
   filterPlaceholder?: string;
   // A prop rather than an emit (Nuxt UI onSelect-style) so its presence can
@@ -111,6 +114,8 @@ onBeforeUnmount(() => {
       v-model:sorting="sorting"
       :data="data"
       :columns="columns"
+      :loading="loading"
+      loading-animation="swing"
       sticky
       class="h-full"
       :ui="{

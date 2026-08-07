@@ -27,6 +27,12 @@ interface CachedDetail {
 const objectCache = new Map<string, CachedDetail>();
 const CACHE_MAX = 50;
 
+// A cluster switch invalidates every cached detail outright: forward-only
+// refresh applies within a cluster identity, never across one.
+export function clearResourceDetailCache() {
+  objectCache.clear();
+}
+
 function cacheSet(key: string, entry: CachedDetail) {
   objectCache.delete(key);
   objectCache.set(key, entry);

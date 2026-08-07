@@ -20,14 +20,27 @@ export function useResource<T extends ResourceRow>(def: ResourceDef<T>) {
   const error = useState<string | null>(`resource:${def.key}:error`, () => null);
   const requestId = useState(`resource:${def.key}:requestId`, () => 0);
 
+  // Whether the informer behind the rows has completed its initial sync.
+  // Per mount: every list entry re-establishes the truth with its first
+  // load, since the informer may have expired since the last visit.
+  const synced = ref(false);
+
   const { selectedNamespaces } = useNamespaces();
 
   async function load() {
     const id = ++requestId.value;
     try {
-      const result = (await GetResourceRows(def.key)) as T[] | null;
+      const result = await GetResourceRows(def.key);
       if (id !== requestId.value) return;
-      allRows.value = (result ?? []).sort((a, b) => a.name.localeCompare(b.name));
+      synced.value = result.synced;
+      if (result.synced) {
+        allRows.value = ((result.rows ?? []) as T[]).sort((a, b) =>
+          a.name.localeCompare(b.name),
+        );
+      }
+      // Pre-sync snapshots are partial: keep showing whatever the session
+      // already has (forward-only) and wait for the post-sync
+      // ResourceUpdated to refetch.
       error.value = null;
     } catch (err) {
       if (id !== requestId.value) return;
@@ -63,5 +76,5 @@ export function useResource<T extends ResourceRow>(def: ResourceDef<T>) {
     return allRows.value.filter((row) => row.namespace && selected.includes(row.namespace));
   });
 
-  return { rows, allRows, error, load };
+  return { rows, allRows, error, synced, load };
 }

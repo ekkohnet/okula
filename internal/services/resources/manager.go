@@ -35,6 +35,9 @@ type watcher struct {
 
 	cancel context.CancelFunc // stops the informer; nil when not running
 	notify func()
+	// Reports the running informer's initial-sync state; nil when no
+	// informer is running. Guarded by svc.mu.
+	hasSynced func() bool
 
 	rowsMu sync.Mutex
 	rows   map[string]map[string]any // projected rows keyed by object UID
@@ -106,6 +109,7 @@ func (svc *Service) handleConnectionChanged(handle *cluster.ConnectionHandle) {
 	var affected []string
 	for key, w := range svc.watchers {
 		w.cancel = nil // informer stopped via connCancel above
+		w.hasSynced = nil
 		w.clearRows()
 		affected = append(affected, key)
 
@@ -138,6 +142,7 @@ func (svc *Service) startInformerLocked(w *watcher) {
 		svc.conn.Dynamic, w.def.GVR, metav1.NamespaceAll, 0, cache.Indexers{}, nil,
 	)
 	informer := generic.Informer()
+	w.hasSynced = informer.HasSynced
 
 	// Strip fields nothing reads before they enter the cache; managedFields
 	// alone is often a third of an object's bytes.

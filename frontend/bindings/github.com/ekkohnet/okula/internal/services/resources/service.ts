@@ -35,10 +35,10 @@ export function GetResourceObject(key: string, $namespace: string, name: string)
 
 /**
  * GetResourceRows returns the current projected rows for a resource type.
- * Empty until the informer's initial sync completes; a ResourceUpdated event
- * signals when to refetch.
+ * Partial (Synced=false) until the informer's initial sync completes; a
+ * ResourceUpdated event signals when to refetch.
  */
-export function GetResourceRows(key: string): $CancellablePromise<({ [_ in string]?: any } | null)[] | null> {
+export function GetResourceRows(key: string): $CancellablePromise<$models.RowsSnapshot> {
     return $Call.ByID(356876871, key);
 }
 

@@ -129,19 +129,34 @@ func (svc *Service) UnsubscribeResource(ctx context.Context, key string) error {
 	return nil
 }
 
+// RowsSnapshot is the rows payload plus whether the informer behind it has
+// completed its initial sync. Pre-sync snapshots are partial: views must
+// not treat them as the truth, nor as an empty result.
+type RowsSnapshot struct {
+	Synced bool             `json:"synced"`
+	Rows   []map[string]any `json:"rows"`
+}
+
 // GetResourceRows returns the current projected rows for a resource type.
-// Empty until the informer's initial sync completes; a ResourceUpdated event
-// signals when to refetch.
-func (svc *Service) GetResourceRows(ctx context.Context, key string) ([]map[string]any, error) {
+// Partial (Synced=false) until the informer's initial sync completes; a
+// ResourceUpdated event signals when to refetch.
+func (svc *Service) GetResourceRows(ctx context.Context, key string) (RowsSnapshot, error) {
 	svc.mu.Lock()
 	w := svc.watchers[key]
+	var hasSynced func() bool
+	if w != nil {
+		hasSynced = w.hasSynced
+	}
 	svc.mu.Unlock()
 
 	if w == nil {
-		return []map[string]any{}, nil
+		return RowsSnapshot{Rows: []map[string]any{}}, nil
 	}
 
-	return w.snapshotRows(), nil
+	return RowsSnapshot{
+		Synced: hasSynced != nil && hasSynced(),
+		Rows:   w.snapshotRows(),
+	}, nil
 }
 
 // --- Events ---
