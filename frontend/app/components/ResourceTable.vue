@@ -27,6 +27,38 @@ const table = useTemplateRef("table");
 
 const filterColumn = computed(() => props.filterColumn ?? "name");
 
+// Visibility is applied here rather than handed to UTable: its virtual
+// spacer rows size colspan from getAllLeafColumns() — hidden columns
+// included — and under table-fixed the resulting phantom columns split
+// the leftover width with the elastic Name column. Filtering ourselves
+// keeps TanStack's column set identical to what renders. (Upstream fix
+// would be getVisibleLeafColumns() for the spacer colspans.)
+const visibleColumns = computed(() =>
+  props.columns.filter((col) => {
+    const c = col as { id?: string };
+    return !c.id || columnVisibility.value[c.id] !== false;
+  }),
+);
+
+// The filter input's target column can't be hidden — filtering against a
+// column TanStack no longer has would break the filtered row model.
+const columnItems = computed(() =>
+  props.columns
+    .map((col) => col as { id?: string; enableHiding?: boolean })
+    .filter((c) => c.id && c.enableHiding !== false && c.id !== filterColumn.value)
+    .map((c) => ({
+      label: upperFirst(c.id!),
+      type: "checkbox" as const,
+      checked: columnVisibility.value[c.id!] !== false,
+      onUpdateChecked(checked: boolean) {
+        columnVisibility.value = { ...columnVisibility.value, [c.id!]: checked };
+      },
+      onSelect(e: Event) {
+        e.preventDefault();
+      },
+    })),
+);
+
 // The elastic Name column must never collapse: under table-fixed, once
 // the container is narrower than the declared widths' sum, width-less
 // columns get exactly zero. The table's minimum width is therefore the
@@ -123,25 +155,7 @@ onBeforeUnmount(() => {
       }"
     />
 
-    <UDropdownMenu
-      :items="
-        table?.tableApi
-          ?.getAllColumns()
-          .filter((column) => column.getCanHide())
-          .map((column) => ({
-            label: upperFirst(column.id),
-            type: 'checkbox' as const,
-            checked: column.getIsVisible(),
-            onUpdateChecked(checked: boolean) {
-              table?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked);
-            },
-            onSelect(e: Event) {
-              e.preventDefault();
-            },
-          }))
-      "
-      :content="{ align: 'end' }"
-    >
+    <UDropdownMenu :items="columnItems" :content="{ align: 'end' }">
       <UButton
         label="Columns"
         color="neutral"
@@ -155,17 +169,24 @@ onBeforeUnmount(() => {
 
   <!-- Flush, no card chrome: boxed = supporting rail, flush = primary
   content. The band sits on the flattened-elevated token with a crisp
-  accented edge; the body ties to the band (tinted hover, soft rows). -->
+  accented edge; the body ties to the band (tinted hover, soft rows).
+  Virtualized: mount cost is viewport rows, not cluster size. This works
+  because the fixed layout owns column widths (no per-window recompute)
+  and rows are uniform height — estimateSize must equal the real row
+  offsetHeight (measured 39; re-measure if row padding or type changes)
+  or the scrollbar corrects visibly near the bottom and scroll restore
+  settles a few pixels off. Padding-spacer rows keep separators, hover,
+  sticky, and scroll save/restore semantics. -->
   <div class="flex-1 min-h-0 mt-4 mb-4" :style="{ '--table-min': minTableRem + 'rem' }">
     <UTable
       ref="table"
       v-model:column-filters="columnFilters"
-      v-model:column-visibility="columnVisibility"
       v-model:sorting="sorting"
       :data="rowsReady ? data : []"
-      :columns="columns"
+      :columns="visibleColumns"
       :loading="loading || !rowsReady"
       loading-animation="swing"
+      :virtualize="{ estimateSize: 39, overscan: 12 }"
       sticky
       class="h-full"
       :ui="{

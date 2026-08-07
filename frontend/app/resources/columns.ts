@@ -13,7 +13,7 @@ export type Severity = "ok" | "pending" | "warn" | "error";
 export const colw = {
   namespace: "w-56",
   status: "w-36",
-  age: "w-32",
+  age: "w-34",
   ready: "w-20",
   restarts: "w-24",
   qos: "w-28",

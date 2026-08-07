@@ -67,7 +67,7 @@ func New(opts Options) (*Okula, error) {
 		Title:  appName,
 		Hidden: false,
 
-		Width:     2000,
+		Width:     2300,
 		Height:    1500,
 		MinWidth:  1024,
 		MinHeight: 768,
