@@ -1,7 +1,7 @@
 import type { TableColumn } from "@nuxt/ui";
 
 import type { ResourceDef, ResourceRow } from "./types";
-import { nameCell, ageCell, dimZero } from "./columns";
+import { nameCell, ageCell, dimZero, w, colw } from "./columns";
 
 export interface RoleRow extends ResourceRow {
   namespace: string;
@@ -16,15 +16,17 @@ const columns: TableColumn<RoleRow>[] = [
     header: "Name",
     cell: ({ row }) => nameCell(row.original.name),
   },
-  { id: "namespace", accessorKey: "namespace", header: "Namespace" },
+  { id: "namespace", accessorKey: "namespace", header: "Namespace", meta: w(colw.namespace) },
   {
     id: "rules",
+    meta: w("w-20"),
     accessorKey: "rules",
     header: "Rules",
     cell: ({ row }) => dimZero(row.original.rules),
   },
   {
     id: "age",
+    meta: w(colw.age),
     accessorKey: "createdAt",
     header: "Age",
     cell: ({ row }) => ageCell(row.original.createdAt),

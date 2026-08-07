@@ -1,7 +1,7 @@
 import type { TableColumn } from "@nuxt/ui";
 
 import type { ResourceDef, ResourceRow } from "./types";
-import { nameCell, ageCell, dimZero } from "./columns";
+import { nameCell, ageCell, dimZero, w, colw } from "./columns";
 
 export interface ClusterRoleRow extends ResourceRow {
   rules: number;
@@ -17,12 +17,14 @@ const columns: TableColumn<ClusterRoleRow>[] = [
   },
   {
     id: "rules",
+    meta: w("w-20"),
     accessorKey: "rules",
     header: "Rules",
     cell: ({ row }) => dimZero(row.original.rules),
   },
   {
     id: "age",
+    meta: w(colw.age),
     accessorKey: "createdAt",
     header: "Age",
     cell: ({ row }) => ageCell(row.original.createdAt),

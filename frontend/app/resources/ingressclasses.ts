@@ -1,7 +1,7 @@
 import type { TableColumn } from "@nuxt/ui";
 
 import type { ResourceDef, ResourceRow } from "./types";
-import { nameCell, ageCell, textOrDash } from "./columns";
+import { nameCell, ageCell, textOrDash, w, colw } from "./columns";
 
 export interface IngressClassRow extends ResourceRow {
   controller: string;
@@ -16,15 +16,17 @@ const columns: TableColumn<IngressClassRow>[] = [
     header: "Name",
     cell: ({ row }) => nameCell(row.original.name),
   },
-  { id: "controller", accessorKey: "controller", header: "Controller" },
+  { id: "controller", accessorKey: "controller", header: "Controller", meta: w("w-64") },
   {
     id: "default",
+    meta: w("w-24"),
     accessorKey: "isDefault",
     header: "Default",
     cell: ({ row }) => textOrDash(row.original.isDefault ? "Default" : ""),
   },
   {
     id: "age",
+    meta: w(colw.age),
     accessorKey: "createdAt",
     header: "Age",
     cell: ({ row }) => ageCell(row.original.createdAt),

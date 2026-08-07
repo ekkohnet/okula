@@ -1,7 +1,7 @@
 import type { TableColumn } from "@nuxt/ui";
 
 import type { ResourceDef, ResourceRow } from "./types";
-import { nameCell, ageCell, dimZero, truncated } from "./columns";
+import { nameCell, ageCell, dimZero, truncated, w, colw } from "./columns";
 
 export interface SecretRow extends ResourceRow {
   namespace: string;
@@ -17,21 +17,24 @@ const columns: TableColumn<SecretRow>[] = [
     header: "Name",
     cell: ({ row }) => nameCell(row.original.name),
   },
-  { id: "namespace", accessorKey: "namespace", header: "Namespace" },
+  { id: "namespace", accessorKey: "namespace", header: "Namespace", meta: w(colw.namespace) },
   {
     id: "type",
+    meta: w("w-64"),
     accessorKey: "type",
     header: "Type",
-    cell: ({ row }) => truncated(row.original.type, "max-w-72"),
+    cell: ({ row }) => truncated(row.original.type),
   },
   {
     id: "data",
+    meta: w("w-20"),
     accessorKey: "data",
     header: "Data",
     cell: ({ row }) => dimZero(row.original.data),
   },
   {
     id: "age",
+    meta: w(colw.age),
     accessorKey: "createdAt",
     header: "Age",
     cell: ({ row }) => ageCell(row.original.createdAt),

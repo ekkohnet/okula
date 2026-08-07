@@ -7,6 +7,27 @@ import { TimeAgo } from "#components";
 // Severity levels emitted by backend projectors for status-ish fields.
 export type Severity = "ok" | "pending" | "warn" | "error";
 
+// Shared column widths for the fixed table layout (see ResourceTable):
+// fact columns hold declared widths, Name stays the elastic column that
+// absorbs window resizing. Kind-specific columns declare theirs inline.
+export const colw = {
+  namespace: "w-56",
+  status: "w-36",
+  age: "w-32",
+  ready: "w-20",
+  restarts: "w-24",
+  qos: "w-28",
+  ip: "w-32",
+  node: "w-56",
+  actions: "w-14",
+} as const;
+
+// w wraps a width class as column meta; the header cell's width is
+// authoritative under table-fixed.
+export function w(width: string): { class: { th: string } } {
+  return { class: { th: width } };
+}
+
 export const severityColor: Record<Severity, BadgeProps["color"]> = {
   ok: "success",
   pending: "info",
@@ -31,9 +52,11 @@ export function severityBadge(status: string, severity: Severity): VNode {
   return h("span", { class: severityBadgeClass[severity] ?? neutralBadgeClass }, status);
 }
 
-// nameCell renders the resource name with emphasis.
+// nameCell renders the resource name with emphasis. Truncates at the
+// column edge: under the fixed layout, long names clip rather than
+// stretch the column.
 export function nameCell(name: string): VNode {
-  return h("span", { class: "font-medium text-highlighted" }, name);
+  return h("span", { class: "font-medium text-highlighted block truncate", title: name }, name);
 }
 
 // dimZero de-emphasises zero values so populated cells stand out.
@@ -54,18 +77,15 @@ export function ageCell(timestamp: number): VNode {
 // machineCell renders a machine string (IP, host, node name, ports) in the
 // grid's bare-mono grammar; dimmed dash when empty. The pill form of the
 // grammar belongs to isolated contexts (detail strips), not dense grids.
-export function machineCell(value: string | null | undefined, widthClass = "max-w-56"): VNode {
+export function machineCell(value: string | null | undefined): VNode {
   if (!value) return h("span", { class: "text-dimmed" }, "—");
-  return h(
-    "span",
-    { class: `font-mono text-xs text-toned block truncate ${widthClass}`, title: value },
-    value,
-  );
+  return h("span", { class: "font-mono text-xs text-toned block truncate", title: value }, value);
 }
 
-// truncated caps a potentially long value, with the full text on hover.
-// Multi-line rendering for lists (e.g. ingress hosts) is later polish.
-export function truncated(value: string | null | undefined, widthClass = "max-w-64"): VNode {
+// truncated caps a potentially long value at the column edge, with the
+// full text on hover. Multi-line rendering (e.g. ingress hosts) is later
+// polish.
+export function truncated(value: string | null | undefined): VNode {
   if (!value) return h("span", { class: "text-dimmed" }, "—");
-  return h("span", { class: `block truncate ${widthClass}`, title: value }, value);
+  return h("span", { class: "block truncate", title: value }, value);
 }

@@ -27,6 +27,25 @@ const table = useTemplateRef("table");
 
 const filterColumn = computed(() => props.filterColumn ?? "name");
 
+// The elastic Name column must never collapse: under table-fixed, once
+// the container is narrower than the declared widths' sum, width-less
+// columns get exactly zero. The table's minimum width is therefore the
+// sum of the visible columns' declared widths plus a readable floor for
+// Name. Requires widths to be w-<n> scale classes (n = rem × 4), which
+// is what the defs declare.
+const NAME_MIN_REM = 16;
+
+const minTableRem = computed(() => {
+  let rem = NAME_MIN_REM;
+  for (const col of props.columns) {
+    const c = col as { id?: string; meta?: { class?: { th?: string } } };
+    if (c.id && columnVisibility.value[c.id] === false) continue;
+    const m = c.meta?.class?.th?.match(/^w-(\d+)$/);
+    if (m) rem += Number(m[1]) / 4;
+  }
+  return rem;
+});
+
 // The filter input works on the lifted state directly rather than through
 // tableApi, so a restored filter shows in the input from the first render.
 const filterValue = computed({
@@ -137,7 +156,7 @@ onBeforeUnmount(() => {
   <!-- Flush, no card chrome: boxed = supporting rail, flush = primary
   content. The band sits on the flattened-elevated token with a crisp
   accented edge; the body ties to the band (tinted hover, soft rows). -->
-  <div class="flex-1 min-h-0 mt-4 mb-4">
+  <div class="flex-1 min-h-0 mt-4 mb-4" :style="{ '--table-min': minTableRem + 'rem' }">
     <UTable
       ref="table"
       v-model:column-filters="columnFilters"
@@ -150,9 +169,16 @@ onBeforeUnmount(() => {
       sticky
       class="h-full"
       :ui="{
+        // Fixed layout: column widths come from the defs' meta (header
+        // cells are authoritative), Name is the elastic remainder. The
+        // computed floor (declared widths + Name minimum) hands narrow
+        // windows to horizontal scroll instead of crushing Name.
+        base: 'w-full min-w-(--table-min) table-fixed',
         separator: 'bg-(--ui-border-accented)',
         th: 'py-2.5 bg-elevated-flat font-medium text-default',
-        td: 'py-2',
+        // Cells clip at the column edge (default-rendered cells have no
+        // wrapper span to truncate them; the td is the boundary).
+        td: 'py-2 overflow-hidden text-ellipsis',
         tbody: 'divide-default/60',
         tr: props.onRowClick ? 'group cursor-pointer hover:bg-elevated-flat/60' : 'group',
       }"

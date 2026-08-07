@@ -6,7 +6,7 @@ import { UIcon, PodDetail } from "#components";
 
 import type { ResourceDef, ResourceRow } from "./types";
 import type { Severity } from "./columns";
-import { nameCell, ageCell, dimZero, severityBadge, machineCell } from "./columns";
+import { nameCell, ageCell, dimZero, severityBadge, machineCell, w, colw } from "./columns";
 
 export interface PodRow extends ResourceRow {
   namespace: string;
@@ -27,41 +27,47 @@ const columns: TableColumn<PodRow>[] = [
     header: "Name",
     cell: ({ row }) => nameCell(row.original.name),
   },
-  { id: "namespace", accessorKey: "namespace", header: "Namespace" },
-  { id: "ready", accessorKey: "ready", header: "Ready" },
+  { id: "namespace", accessorKey: "namespace", header: "Namespace", meta: w(colw.namespace) },
+  { id: "ready", accessorKey: "ready", header: "Ready", meta: w(colw.ready) },
   {
     id: "restarts",
+    meta: w(colw.restarts),
     accessorKey: "restarts",
     header: "Restarts",
     cell: ({ row }) => dimZero(row.original.restarts),
   },
   {
     id: "status",
+    meta: w(colw.status),
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => severityBadge(row.original.status, row.original.statusSeverity),
   },
-  { id: "qos", accessorKey: "qos", header: "QoS" },
+  { id: "qos", accessorKey: "qos", header: "QoS", meta: w(colw.qos) },
   {
     id: "ip",
+    meta: w(colw.ip),
     accessorKey: "ip",
     header: "IP",
-    cell: ({ row }) => machineCell(row.original.ip, "max-w-36"),
+    cell: ({ row }) => machineCell(row.original.ip),
   },
   {
     id: "node",
+    meta: w(colw.node),
     accessorKey: "node",
     header: "Node",
     cell: ({ row }) => machineCell(row.original.node),
   },
   {
     id: "age",
+    meta: w(colw.age),
     accessorKey: "createdAt",
     header: "Age",
     cell: ({ row }) => ageCell(row.original.createdAt),
   },
   {
     id: "actions",
+    meta: w(colw.actions),
     enableHiding: false,
     enableSorting: false,
     cell: ({ row }) =>

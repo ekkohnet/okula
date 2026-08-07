@@ -2,7 +2,16 @@ import type { TableColumn } from "@nuxt/ui";
 
 import type { ResourceDef, ResourceRow } from "./types";
 import type { Severity } from "./columns";
-import { nameCell, ageCell, dimZero, textOrDash, severityBadge, machineCell } from "./columns";
+import {
+  nameCell,
+  ageCell,
+  dimZero,
+  textOrDash,
+  severityBadge,
+  machineCell,
+  w,
+  colw,
+} from "./columns";
 
 export interface NodeRow extends ResourceRow {
   status: string;
@@ -23,31 +32,36 @@ const columns: TableColumn<NodeRow>[] = [
   },
   {
     id: "status",
+    meta: w(colw.status),
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => severityBadge(row.original.status, row.original.statusSeverity),
   },
   {
     id: "roles",
+    meta: w("w-44"),
     accessorKey: "roles",
     header: "Roles",
     cell: ({ row }) => textOrDash(row.original.roles),
   },
-  { id: "version", accessorKey: "version", header: "Version" },
+  { id: "version", accessorKey: "version", header: "Version", meta: w("w-48") },
   {
     id: "internalIP",
+    meta: w("w-32"),
     accessorKey: "internalIP",
     header: "Internal IP",
-    cell: ({ row }) => machineCell(row.original.internalIP, "max-w-36"),
+    cell: ({ row }) => machineCell(row.original.internalIP),
   },
   {
     id: "taints",
+    meta: w("w-20"),
     accessorKey: "taints",
     header: "Taints",
     cell: ({ row }) => dimZero(row.original.taints),
   },
   {
     id: "age",
+    meta: w(colw.age),
     accessorKey: "createdAt",
     header: "Age",
     cell: ({ row }) => ageCell(row.original.createdAt),

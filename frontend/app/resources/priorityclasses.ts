@@ -1,7 +1,7 @@
 import type { TableColumn } from "@nuxt/ui";
 
 import type { ResourceDef, ResourceRow } from "./types";
-import { nameCell, ageCell, textOrDash } from "./columns";
+import { nameCell, ageCell, textOrDash, w, colw } from "./columns";
 
 export interface PriorityClassRow extends ResourceRow {
   value: number;
@@ -16,15 +16,17 @@ const columns: TableColumn<PriorityClassRow>[] = [
     header: "Name",
     cell: ({ row }) => nameCell(row.original.name),
   },
-  { id: "value", accessorKey: "value", header: "Value" },
+  { id: "value", accessorKey: "value", header: "Value", meta: w("w-32") },
   {
     id: "globalDefault",
+    meta: w("w-36"),
     accessorKey: "globalDefault",
     header: "Global Default",
     cell: ({ row }) => textOrDash(row.original.globalDefault ? "Default" : ""),
   },
   {
     id: "age",
+    meta: w(colw.age),
     accessorKey: "createdAt",
     header: "Age",
     cell: ({ row }) => ageCell(row.original.createdAt),
