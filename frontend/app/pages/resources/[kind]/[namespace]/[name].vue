@@ -18,15 +18,22 @@ const def = resourceRegistry[kind];
 </script>
 
 <template>
-  <div v-if="def && def.namespaced" class="h-full min-h-0 flex flex-col px-3">
+  <component
+    :is="def.detail"
+    v-if="def && def.namespaced && def.detail"
+    :def="def"
+    :namespace="namespace"
+    :name="name"
+  />
+  <div v-else-if="def && def.namespaced" class="h-full min-h-0 flex flex-col px-3">
     <PageHeader
       :title="name"
       copy-title
       :breadcrumb="[{ label: def.title, to: `/resources/${kind}` }, { label: namespace }]"
       :back-fallback="`/resources/${kind}`"
     />
-    <!-- Deliberately bare: the spine proves list → detail → back feel
-    before the page grows content. -->
+    <!-- Bare fallback for kinds without a bespoke detail page; the generic
+    baseline replaces it as a later piece. -->
   </div>
   <ResourceNotFound v-else />
 </template>

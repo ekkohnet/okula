@@ -2,7 +2,7 @@ import { h } from "vue";
 import type { TableColumn } from "@nuxt/ui";
 
 import { navigateTo } from "#imports";
-import { UButton, UTooltip, PodSummary } from "#components";
+import { UButton, UTooltip, PodDetail } from "#components";
 
 import type { ResourceDef, ResourceRow } from "./types";
 import type { Severity } from "./columns";
@@ -89,5 +89,5 @@ export const podsResource: ResourceDef<PodRow> = {
   noun: "pods",
   namespaced: true,
   columns,
-  summary: PodSummary,
+  detail: PodDetail,
 };

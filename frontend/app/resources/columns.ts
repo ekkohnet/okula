@@ -7,7 +7,7 @@ import { UBadge, TimeAgo } from "#components";
 // Severity levels emitted by backend projectors for status-ish fields.
 export type Severity = "ok" | "pending" | "warn" | "error";
 
-const severityColor: Record<Severity, BadgeProps["color"]> = {
+export const severityColor: Record<Severity, BadgeProps["color"]> = {
   ok: "success",
   pending: "info",
   warn: "warning",

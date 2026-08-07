@@ -19,9 +19,9 @@ export interface ResourceDef<T extends ResourceRow> {
   noun: string;
   namespaced: boolean;
   columns: TableColumn<T>[];
-  // Bespoke summary panel; the generic baseline (ResourceSummary) renders
-  // when absent.
-  summary?: Component;
+  // Bespoke detail page; the bare fallback renders when absent (the
+  // generic baseline is a future piece).
+  detail?: Component;
 }
 
 // A def with its row type erased: what the registry stores and what the

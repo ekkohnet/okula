@@ -1,10 +1,9 @@
 import type { BadgeProps } from "@nuxt/ui";
 
 // Display projection for the pod detail page: the raw pod object becomes
-// the shapes the page components render. Container-state logic is ported
-// from the slideover-era PodSummary; the rest fills out the mock's spec
-// (sidecar grouping, ephemeral containers, ports/env/probes/resources,
-// conditions, labels/annotations). Status-strip facts (status, ready,
+// the shapes the page components render (container state, sidecar
+// grouping, ephemeral containers, ports/env/probes/resources, conditions,
+// labels/annotations). Status-strip facts (status, ready,
 // restarts, ...) are NOT derived here — they come from ObjectDetail.row,
 // the same backend projection the list shows.
 
