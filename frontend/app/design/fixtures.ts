@@ -1,39 +1,10 @@
 import type { BadgeProps } from "@nuxt/ui";
 
+import type { PodContainerView } from "~/utils/podView";
+
 // Static fixtures for the /design/* mock pages. Display-level shapes (not
-// raw K8s objects): the mocks explore layout, not parsing — the real page
-// reuses PodSummary's projection logic.
-
-// cAdvisor-shaped usage: per-container samples plus the spec's
-// requests/limits for headroom meters. One sample per minute, oldest first.
-export interface ContainerMetrics {
-  cpuRequest?: number;
-  cpuLimit?: number;
-  memoryRequest?: number;
-  memoryLimit?: number;
-  cpu: number[]; // millicores
-  memory: number[]; // MiB
-}
-
-export interface FixtureContainer {
-  name: string;
-  image: string;
-  state: string;
-  color: BadgeProps["color"];
-  restarts: number;
-  since?: number;
-  detail?: string;
-  metrics?: ContainerMetrics;
-  // Native sidecar (init container with restartPolicy: Always) — grouped
-  // with the running containers, tagged, and included in metrics.
-  sidecar?: boolean;
-  // Ephemeral containers only: the container whose process namespace the
-  // debug session targets.
-  target?: string;
-  ports?: { name?: string; port: number; protocol?: string }[];
-  env?: { name: string; value?: string; from?: string }[];
-  probes?: { kind: string; summary: string }[];
-}
+// raw K8s objects): containers use the real page's PodContainerView
+// projection shape directly, so the mock proves the real components.
 
 export interface FixtureCondition {
   type: string;
@@ -69,11 +40,11 @@ export interface PodFixture {
   controlledBy: string;
   uid: string;
   createdAt: number;
-  initContainers: FixtureContainer[];
-  containers: FixtureContainer[];
+  initContainers: PodContainerView[];
+  containers: PodContainerView[];
   // Debug attachments (kubectl debug). Usually absent; terminated ones
   // linger in the spec forever — both states need a rendering.
-  ephemeralContainers?: FixtureContainer[];
+  ephemeralContainers?: PodContainerView[];
   conditions: FixtureCondition[];
   labels: [string, string][];
   annotations: [string, string][];
@@ -120,6 +91,10 @@ export const podFixtures: PodFixture[] = [
         ports: [{ name: "admin", port: 9901 }],
         env: [{ name: "ENVOY_LOG_LEVEL", value: "warn" }],
         probes: [{ kind: "readiness", summary: "http-get :9901/ready · every 5s" }],
+        resources: [
+          ["Requests", "100m · 128Mi"],
+          ["Limits", "200m · 256Mi"],
+        ],
         metrics: {
           cpuRequest: 100,
           cpuLimit: 200,
@@ -151,6 +126,10 @@ export const podFixtures: PodFixture[] = [
         probes: [
           { kind: "liveness", summary: "http-get :8080/healthz · every 10s" },
           { kind: "readiness", summary: "http-get :8080/ready · every 5s" },
+        ],
+        resources: [
+          ["Requests", "250m · 256Mi"],
+          ["Limits", "1000m · 512Mi"],
         ],
         metrics: {
           cpuRequest: 250,
@@ -211,6 +190,10 @@ export const podFixtures: PodFixture[] = [
           { name: "BATCH_SIZE", value: "500" },
         ],
         probes: [{ kind: "liveness", summary: "exec ./healthcheck · every 30s" }],
+        resources: [
+          ["Requests", "500m · 256Mi"],
+          ["Limits", "500m · 256Mi"],
+        ],
         // Sawtooth: climbs while running, drops to zero on each crash.
         metrics: {
           cpuRequest: 500,
@@ -334,6 +317,10 @@ export const podFixtures: PodFixture[] = [
         sidecar: true,
         ports: [{ name: "metrics", port: 2020 }],
         env: [{ name: "FLB_LOG_LEVEL", value: "info" }],
+        resources: [
+          ["Requests", "100m · 128Mi"],
+          ["Limits", "200m · 256Mi"],
+        ],
         metrics: {
           cpuRequest: 100,
           cpuLimit: 200,
@@ -368,6 +355,10 @@ export const podFixtures: PodFixture[] = [
           { kind: "liveness", summary: "http-get :13133/ · every 10s" },
           { kind: "readiness", summary: "http-get :13133/ · every 10s" },
         ],
+        resources: [
+          ["Requests", "400m · 768Mi"],
+          ["Limits", "800m · 1200Mi"],
+        ],
         // Memory creeping toward the limit again after the OOMKill.
         metrics: {
           cpuRequest: 400,
@@ -385,6 +376,10 @@ export const podFixtures: PodFixture[] = [
         color: "success",
         restarts: 0,
         since: now - 41 * day,
+        resources: [
+          ["Requests", "10m · 24Mi"],
+          ["Limits", "— · 64Mi"],
+        ],
         metrics: {
           cpuRequest: 10,
           memoryRequest: 24,
@@ -403,6 +398,10 @@ export const podFixtures: PodFixture[] = [
         detail: "Readiness probe failing: HTTP 503",
         ports: [{ name: "web", port: 9090 }],
         probes: [{ kind: "readiness", summary: "http-get :9090/-/ready · every 10s" }],
+        resources: [
+          ["Requests", "250m · 512Mi"],
+          ["Limits", "500m · 512Mi"],
+        ],
         metrics: {
           cpuRequest: 250,
           cpuLimit: 500,
@@ -419,6 +418,10 @@ export const podFixtures: PodFixture[] = [
         color: "success",
         restarts: 0,
         since: now - 41 * day,
+        resources: [
+          ["Requests", "50m · 64Mi"],
+          ["Limits", "100m · 128Mi"],
+        ],
         metrics: {
           cpuRequest: 50,
           cpuLimit: 100,

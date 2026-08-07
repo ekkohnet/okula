@@ -1,10 +1,5 @@
 <script setup lang="ts">
 import { podFixtures } from "~/design/fixtures";
-import SectionTitle from "~/design/SectionTitle.vue";
-import MetricChart from "~/design/MetricChart.vue";
-import LabelChips from "~/design/LabelChips.vue";
-import AnnotationList from "~/design/AnnotationList.vue";
-import ContainerCard from "~/design/ContainerCard.vue";
 
 // Static mock of the full-page pod detail (ui-redesign.md). Fixture data,
 // no backend wiring; the floating panel flips the contested layout

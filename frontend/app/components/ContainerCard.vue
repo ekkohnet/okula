@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import type { FixtureContainer } from "~/design/fixtures";
+import type { PodContainerView } from "~/utils/podView";
 
 // Per-container card: collapsed shows the triage essentials (state,
 // restarts, image, headroom meters); expanding reveals the fuller spec —
-// ports, environment, probes, resources. Mounts join later.
+// ports, resources, probes, environment. Mounts join later. Meters render
+// only when live metrics exist (future cAdvisor piece); Resources rows
+// come from the spec and don't wait for it.
 
-const props = defineProps<{
-  container: FixtureContainer;
-  showMetrics: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    container: PodContainerView;
+    showMetrics?: boolean;
+  }>(),
+  { showMetrics: true },
+);
 
 const open = ref(false);
 
@@ -50,21 +55,6 @@ function meterStyle(ratio: number): { track: string; fill: string } {
   if (ratio >= 0.8) return { track: "bg-warning/20", fill: "bg-warning" };
   return { track: "bg-primary/15", fill: "bg-primary" };
 }
-
-const resources = computed<[string, string][]>(() => {
-  const m = props.container.metrics;
-  if (!m) return [];
-  const fmt = (cpu?: number, mem?: number) =>
-    cpu === undefined && mem === undefined
-      ? ""
-      : `${cpu !== undefined ? `${cpu}m` : "—"} · ${mem !== undefined ? `${mem}Mi` : "—"}`;
-  const rows: [string, string][] = [];
-  const requests = fmt(m.cpuRequest, m.memoryRequest);
-  const limits = fmt(m.cpuLimit, m.memoryLimit);
-  if (requests) rows.push(["Requests", requests]);
-  if (limits) rows.push(["Limits", limits]);
-  return rows;
-});
 </script>
 
 <template>
@@ -132,10 +122,10 @@ const resources = computed<[string, string][]>(() => {
         </div>
       </div>
 
-      <div v-if="resources.length">
+      <div v-if="container.resources?.length">
         <p class="text-xs text-muted mb-1.5">Resources</p>
         <div class="flex flex-col gap-1 font-mono text-xs/5">
-          <div v-for="[label, value] in resources" :key="label">
+          <div v-for="[label, value] in container.resources" :key="label">
             <span class="text-muted">{{ label }}</span>
             <span class="tabular-nums"> {{ value }}</span>
           </div>
@@ -155,11 +145,14 @@ const resources = computed<[string, string][]>(() => {
       <div v-if="container.env?.length">
         <p class="text-xs text-muted mb-1.5">Environment</p>
         <div class="flex flex-col gap-1 font-mono text-xs/5 min-w-0">
-          <div v-for="e in container.env" :key="e.name" class="truncate">
+          <!-- Indexed keys: envFrom wildcard rows can share the name "*". -->
+          <div v-for="(e, i) in container.env" :key="`${i}:${e.name}`" class="truncate">
             <span class="text-muted">{{ e.name }}</span>
-            <span class="text-dimmed">=</span>
-            <span v-if="e.value !== undefined">{{ e.value }}</span>
-            <span v-else class="text-dimmed">← {{ e.from }}</span>
+            <template v-if="e.value !== undefined">
+              <span class="text-dimmed">=</span>
+              <span>{{ e.value }}</span>
+            </template>
+            <span v-else class="text-dimmed"> ← {{ e.from }}</span>
           </div>
         </div>
       </div>
