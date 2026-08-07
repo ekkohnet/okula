@@ -195,7 +195,11 @@ onBeforeUnmount(() => {
         // computed floor (declared widths + Name minimum) hands narrow
         // windows to horizontal scroll instead of crushing Name.
         base: 'w-full min-w-(--table-min) table-fixed',
-        separator: 'bg-(--ui-border-accented)',
+        // -mt-px: the separator is an absolute overlay whose natural spot
+        // covers the first row's top padding pixel; shifted up it covers
+        // the band's bottom pixel instead, keeping row one's padding
+        // symmetric. Out of flow, so no layout or virtual sizing impact.
+        separator: 'mt-[-0.5px] bg-(--ui-border-accented)',
         th: 'py-2.5 bg-elevated-flat font-medium text-default',
         // Cells clip at the column edge (default-rendered cells have no
         // wrapper span to truncate them; the td is the boundary).
