@@ -2,7 +2,7 @@ import { h } from "vue";
 import type { TableColumn } from "@nuxt/ui";
 
 import { navigateTo } from "#imports";
-import { UButton, PodDetail } from "#components";
+import { UIcon, PodDetail } from "#components";
 
 import type { ResourceDef, ResourceRow } from "./types";
 import type { Severity } from "./columns";
@@ -65,22 +65,29 @@ const columns: TableColumn<PodRow>[] = [
     enableHiding: false,
     enableSorting: false,
     cell: ({ row }) =>
-      // Native title, not UTooltip: a tooltip component instance per row is
-      // real mount cost at cluster scale (perf pass, 2026-08-07).
-      h(UButton, {
-        icon: "i-lucide-scroll-text",
-        color: "neutral",
-        variant: "ghost",
-        // Revealed by row hover; the tr carries the group class.
-        class: "ml-auto size-5 opacity-0 group-hover:opacity-100 transition-opacity",
-        "aria-label": "View logs",
-        title: "Logs",
-        onClick: (e: MouseEvent) => {
-          // Keep the action from also triggering the row's detail click.
-          e.stopPropagation();
-          navigateTo(`/resources/pods/${row.original.namespace}/${row.original.name}/logs`);
+      // Plain button mirroring UButton ghost/neutral hover styling — a
+      // component instance per row is measurable table cost and these
+      // props never vary. Native title, not UTooltip, for the same
+      // reason. Re-check styling on Nuxt UI upgrades (4.10 now).
+      // Revealed by row hover; the tr carries the group class.
+      h(
+        "button",
+        {
+          type: "button",
+          class:
+            "ml-auto flex size-5 items-center justify-center rounded-md cursor-pointer " +
+            "text-default hover:bg-elevated active:bg-elevated " +
+            "opacity-0 group-hover:opacity-100 transition-opacity",
+          "aria-label": "View logs",
+          title: "Logs",
+          onClick: (e: MouseEvent) => {
+            // Keep the action from also triggering the row's detail click.
+            e.stopPropagation();
+            navigateTo(`/resources/pods/${row.original.namespace}/${row.original.name}/logs`);
+          },
         },
-      }),
+        h(UIcon, { name: "i-lucide-scroll-text", class: "size-5 shrink-0" }),
+      ),
   },
 ];
 

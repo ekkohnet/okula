@@ -34,9 +34,13 @@ export function useResource<T extends ResourceRow>(def: ResourceDef<T>) {
       if (id !== requestId.value) return;
       synced.value = result.synced;
       if (result.synced) {
-        allRows.value = ((result.rows ?? []) as T[]).sort((a, b) =>
-          a.name.localeCompare(b.name),
-        );
+        const rows = ((result.rows ?? []) as T[]).sort((a, b) => a.name.localeCompare(b.name));
+        // Rows are immutable snapshots, replaced wholesale. Freezing makes
+        // Vue skip reactive conversion entirely — the profiler showed
+        // proxy creation + dependency tracking per cell read as a large
+        // slice of table render cost.
+        rows.forEach(Object.freeze);
+        allRows.value = Object.freeze(rows) as T[];
       }
       // Pre-sync snapshots are partial: keep showing whatever the session
       // already has (forward-only) and wait for the post-sync

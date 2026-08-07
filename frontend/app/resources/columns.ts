@@ -2,7 +2,7 @@ import { h } from "vue";
 import type { VNode } from "vue";
 import type { BadgeProps } from "@nuxt/ui";
 
-import { UBadge, TimeAgo } from "#components";
+import { TimeAgo } from "#components";
 
 // Severity levels emitted by backend projectors for status-ish fields.
 export type Severity = "ok" | "pending" | "warn" | "error";
@@ -14,17 +14,21 @@ export const severityColor: Record<Severity, BadgeProps["color"]> = {
   error: "error",
 };
 
+// Mirrors UBadge (variant=soft, size=sm) from Nuxt UI's badge theme: a
+// component instance per row is measurable table cost and these props
+// never vary. Re-check the strings when upgrading Nuxt UI (4.10 now).
+const badgeBase = "font-medium inline-flex items-center text-[10px]/3 px-1.5 py-1 gap-1 rounded-sm";
+const severityBadgeClass: Record<Severity, string> = {
+  ok: `${badgeBase} bg-success/10 text-success`,
+  pending: `${badgeBase} bg-info/10 text-info`,
+  warn: `${badgeBase} bg-warning/10 text-warning`,
+  error: `${badgeBase} bg-error/10 text-error`,
+};
+const neutralBadgeClass = `${badgeBase} bg-elevated text-default`;
+
 // severityBadge renders a status string as a badge coloured by severity.
 export function severityBadge(status: string, severity: Severity): VNode {
-  return h(
-    UBadge,
-    {
-      color: severityColor[severity] ?? "neutral",
-      variant: "soft",
-      size: "sm",
-    },
-    () => status,
-  );
+  return h("span", { class: severityBadgeClass[severity] ?? neutralBadgeClass }, status);
 }
 
 // nameCell renders the resource name with emphasis.
