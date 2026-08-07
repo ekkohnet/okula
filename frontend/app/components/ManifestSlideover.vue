@@ -58,7 +58,7 @@ onBeforeUnmount(() => clearTimeout(copyTimer));
   <USlideover
     v-model:open="open"
     :title="title"
-    class="max-w-5xl bg-elevated-flat sm:shadow-[-16px_0_32px_rgb(0_0_0/0.4)]"
+    class="max-w-5xl bg-elevated-flat sm:shadow-[-16px_0_32px_rgb(0_0_0/0.35)]"
     :overlay="false"
     :modal="false"
     dismissible
