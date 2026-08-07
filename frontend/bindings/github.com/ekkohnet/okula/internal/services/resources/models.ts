@@ -11,6 +11,12 @@ export interface ObjectDetail {
     "uid": string;
     "yaml": string;
     "object": { [_ in string]?: any } | null;
+
+    /**
+     * Row is the same projection the list view shows, so a detail page's
+     * status facts can never disagree with the row that was clicked.
+     */
+    "row": { [_ in string]?: any } | null;
 }
 
 /**

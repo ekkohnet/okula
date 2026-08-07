@@ -23,6 +23,9 @@ type ObjectDetail struct {
 	UID    string         `json:"uid"`
 	Yaml   string         `json:"yaml"`
 	Object map[string]any `json:"object"`
+	// Row is the same projection the list view shows, so a detail page's
+	// status facts can never disagree with the row that was clicked.
+	Row map[string]any `json:"row"`
 }
 
 // GetResourceObject fetches an object live from the cluster. Always a fresh
@@ -62,6 +65,11 @@ func (svc *Service) GetResourceObject(ctx context.Context, key, namespace, name 
 	// managedFields is noise in a read view; kubectl hides it too.
 	unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
 
+	row, err := def.ProjectRow(obj)
+	if err != nil {
+		return ObjectDetail{}, fmt.Errorf("project %s %s: %w", key, ref, err)
+	}
+
 	out, err := yaml.Marshal(obj.Object)
 	if err != nil {
 		return ObjectDetail{}, fmt.Errorf("marshal %s %s: %w", key, ref, err)
@@ -71,5 +79,6 @@ func (svc *Service) GetResourceObject(ctx context.Context, key, namespace, name 
 		UID:    string(obj.GetUID()),
 		Yaml:   string(out),
 		Object: obj.Object,
+		Row:    row,
 	}, nil
 }
