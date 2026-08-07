@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { podFixtures } from "~/design/fixtures";
 
-// Static mock of the full-page pod detail (ui-redesign.md). Fixture data,
-// no backend wiring; the floating panel flips the contested layout
-// decisions in place. Delete (or grow into a gallery) once the design
-// settles.
+// Design sandbox for the pod page's container cards (ui-redesign.md).
+// The pod page design shipped; this page stays because it renders the
+// promoted real components against static stress fixtures — the vehicle
+// for the queued container-card content pass. Dies when that settles.
 
 const fixtureKey = ref("ugly");
 const fixtureItems = podFixtures.map((f) => ({ label: f.label, value: f.key }));
