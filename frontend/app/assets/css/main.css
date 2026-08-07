@@ -9,6 +9,10 @@
      be translucent (the sticky table header band). Same rendered colour as
      the sidebar and rail cards (#131D2C on the dark theme). */
   --color-elevated-flat: color-mix(in srgb, var(--ui-bg-elevated) 25%, var(--ui-bg));
+
+  /* The dark reading well for raw machine text (log pane, manifest pane):
+     the counterpart to elevated — content sinks below the page. */
+  --color-sunken: var(--color-gray-950);
 }
 
 :root {

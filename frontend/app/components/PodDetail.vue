@@ -24,6 +24,8 @@ const { row, detail, events, error, showLoading, eventsLoading, eventsError } =
 
 const view = computed(() => (detail.value ? projectPodView(detail.value.object) : null));
 
+const manifestOpen = ref(false);
+
 const railSectionClass = "rounded-md border border-default bg-elevated/25 p-4";
 </script>
 
@@ -44,8 +46,21 @@ const railSectionClass = "rounded-md border border-default bg-elevated/25 p-4";
         >
           Logs
         </UButton>
+        <!-- Enabled once the fetch (or cache seed) lands: the YAML is part
+        of the same payload, so an enabled button always has content. -->
+        <UButton
+          icon="i-lucide-file-code"
+          color="neutral"
+          variant="soft"
+          :disabled="!detail"
+          @click="manifestOpen = true"
+        >
+          Manifest
+        </UButton>
       </template>
     </PageHeader>
+
+    <ManifestSlideover v-model:open="manifestOpen" :yaml="detail?.yaml ?? ''" :title="name" />
 
     <div class="flex-1 min-h-0 overflow-y-auto">
       <!-- A failed refetch over cached content stays quiet; the alert
@@ -134,10 +149,7 @@ const railSectionClass = "rounded-md border border-default bg-elevated/25 p-4";
               </div>
             </div>
           </div>
-          <div
-            class="flex flex-wrap items-start gap-x-12 gap-y-4"
-            :class="view ? '' : 'invisible'"
-          >
+          <div class="flex flex-wrap items-start gap-x-12 gap-y-4" :class="view ? '' : 'invisible'">
             <div class="min-w-0">
               <p class="text-xs text-muted mb-1.5">Controlled By</p>
               <div class="flex items-center h-6 min-w-0">
@@ -246,7 +258,11 @@ const railSectionClass = "rounded-md border border-default bg-elevated/25 p-4";
                       {{ c.status }}
                     </UBadge>
                     <span v-if="c.reason" class="text-xs text-muted">{{ c.reason }}</span>
-                    <TimeAgo v-if="c.time" :timestamp="c.time" class="text-xs text-dimmed ml-auto" />
+                    <TimeAgo
+                      v-if="c.time"
+                      :timestamp="c.time"
+                      class="text-xs text-dimmed ml-auto"
+                    />
                   </div>
                   <p v-if="c.message" class="text-xs text-muted mt-1">{{ c.message }}</p>
                 </div>

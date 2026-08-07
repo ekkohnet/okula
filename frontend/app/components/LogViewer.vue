@@ -192,7 +192,7 @@ watch(lines, async () => {
     </div>
 
     <!-- Log pane -->
-    <div class="relative flex-1 min-h-0 border border-default rounded-md bg-gray-950">
+    <div class="relative flex-1 min-h-0 border border-default rounded-md bg-sunken">
       <div
         ref="scrollEl"
         class="h-full overflow-auto font-mono text-xs leading-5 p-3"

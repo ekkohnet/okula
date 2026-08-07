@@ -25,15 +25,6 @@ const def = resourceRegistry[kind];
     :namespace="namespace"
     :name="name"
   />
-  <div v-else-if="def && def.namespaced" class="h-full min-h-0 flex flex-col px-3">
-    <PageHeader
-      :title="name"
-      copy-title
-      :breadcrumb="[{ label: def.title, to: `/resources/${kind}` }, { label: namespace }]"
-      :back-fallback="`/resources/${kind}`"
-    />
-    <!-- Bare fallback for kinds without a bespoke detail page; the generic
-    baseline replaces it as a later piece. -->
-  </div>
+  <BareDetail v-else-if="def && def.namespaced" :def="def" :namespace="namespace" :name="name" />
   <ResourceNotFound v-else />
 </template>
