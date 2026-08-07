@@ -1,7 +1,7 @@
 import type { TableColumn } from "@nuxt/ui";
 
 import type { ResourceDef, ResourceRow } from "./types";
-import { nameCell, ageCell, textOrDash, truncated } from "./columns";
+import { nameCell, ageCell, textOrDash, machineCell } from "./columns";
 
 export interface IngressRow extends ResourceRow {
   namespace: string;
@@ -30,15 +30,20 @@ const columns: TableColumn<IngressRow>[] = [
     id: "hosts",
     accessorKey: "hosts",
     header: "Hosts",
-    cell: ({ row }) => truncated(row.original.hosts, "max-w-72"),
+    cell: ({ row }) => machineCell(row.original.hosts, "max-w-72"),
   },
   {
     id: "address",
     accessorKey: "address",
     header: "Address",
-    cell: ({ row }) => truncated(row.original.address, "max-w-56"),
+    cell: ({ row }) => machineCell(row.original.address),
   },
-  { id: "ports", accessorKey: "ports", header: "Ports" },
+  {
+    id: "ports",
+    accessorKey: "ports",
+    header: "Ports",
+    cell: ({ row }) => machineCell(row.original.ports, "max-w-36"),
+  },
   {
     id: "age",
     accessorKey: "createdAt",

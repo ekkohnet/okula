@@ -34,7 +34,7 @@ const open = computed({
     v-model:open="open"
     :title="instance?.entry.shortName || instance?.entry.contextName"
     :description="instance?.entry.contextName"
-    class="max-w-2xl bg-[#131D2C]"
+    class="max-w-2xl bg-elevated-flat"
     :overlay="false"
     :modal="false"
     dismissible

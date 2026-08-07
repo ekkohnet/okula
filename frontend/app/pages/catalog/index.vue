@@ -210,9 +210,9 @@ const table = useTemplateRef("table");
           class="h-full"
           :ui="{
             separator: 'bg-border',
-            tr: 'data-[selected=true]:bg-[#131D2C] cursor-pointer',
+            tr: 'data-[selected=true]:bg-elevated-flat cursor-pointer',
             td: 'py-2',
-            th: 'bg-[#131D2C]',
+            th: 'bg-elevated-flat',
           }"
           @hover="onHover"
           @select="(_e: Event, row: TableRow<ClusterInstance>) => openDetail(row.original.id)"

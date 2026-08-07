@@ -4,6 +4,11 @@
 @theme {
   --font-sans: "Geist", sans-serif;
   --font-mono: "Geist Mono", monospace;
+
+  /* The elevated/25 surface flattened to a solid, for surfaces that can't
+     be translucent (the sticky table header band). Same rendered colour as
+     the sidebar and rail cards (#131D2C on the dark theme). */
+  --color-elevated-flat: color-mix(in srgb, var(--ui-bg-elevated) 25%, var(--ui-bg));
 }
 
 :root {

@@ -53,12 +53,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex items-center mt-6">
+  <div class="flex items-center mt-8">
     <!-- Resource names are machine strings: keep WebKit's text
     substitutions (e.g. sentence capitalization, committed on blur) out. -->
     <UInput
       v-model="filterValue"
-      class="max-w-sm min-w-lg"
+      class="w-80"
       icon="i-lucide-search"
       :placeholder="props.filterPlaceholder ?? 'Filter by name...'"
       autocapitalize="off"
@@ -100,27 +100,31 @@ onBeforeUnmount(() => {
     </UDropdownMenu>
   </div>
 
-  <div
-    class="flex-1 min-h-0 divide-y divide-accented w-full mt-6 flex flex-col border border-default rounded-md"
-  >
-    <div class="flex-1 min-h-0 overflow-auto rounded-t-md">
-      <UTable
-        ref="table"
-        v-model:column-filters="columnFilters"
-        v-model:column-visibility="columnVisibility"
-        v-model:sorting="sorting"
-        :data="data"
-        :columns="columns"
-        sticky
-        class="h-full"
-        :ui="{
-          separator: 'bg-border',
-          tr: props.onRowClick ? 'cursor-pointer' : '',
-          td: 'py-2',
-          th: 'bg-[#131D2C]',
-        }"
-        @select="(_e: Event, row: TableRow<T>) => props.onRowClick?.(row.original)"
-      />
-    </div>
+  <!-- Flush, no card chrome: boxed = supporting rail, flush = primary
+  content. The band sits on the flattened-elevated token with a crisp
+  accented edge; the body ties to the band (tinted hover, soft rows). -->
+  <div class="flex-1 min-h-0 mt-4 mb-4">
+    <UTable
+      ref="table"
+      v-model:column-filters="columnFilters"
+      v-model:column-visibility="columnVisibility"
+      v-model:sorting="sorting"
+      :data="data"
+      :columns="columns"
+      sticky
+      class="h-full"
+      :ui="{
+        separator: 'bg-(--ui-border-accented)',
+        th: 'py-2.5 bg-elevated-flat font-medium text-default',
+        td: 'py-2',
+        tbody: 'divide-default/60',
+        tr: props.onRowClick ? 'group cursor-pointer hover:bg-elevated-flat/60' : 'group',
+      }"
+      @select="(_e: Event, row: TableRow<T>) => props.onRowClick?.(row.original)"
+    >
+      <template v-if="$slots.empty" #empty>
+        <slot name="empty" />
+      </template>
+    </UTable>
   </div>
 </template>

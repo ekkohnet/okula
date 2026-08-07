@@ -1,7 +1,7 @@
 import type { TableColumn } from "@nuxt/ui";
 
 import type { ResourceDef, ResourceRow } from "./types";
-import { nameCell, ageCell, textOrDash, truncated } from "./columns";
+import { nameCell, ageCell, machineCell } from "./columns";
 
 export interface ServiceRow extends ResourceRow {
   namespace: string;
@@ -25,19 +25,19 @@ const columns: TableColumn<ServiceRow>[] = [
     id: "clusterIP",
     accessorKey: "clusterIP",
     header: "Cluster IP",
-    cell: ({ row }) => textOrDash(row.original.clusterIP),
+    cell: ({ row }) => machineCell(row.original.clusterIP, "max-w-36"),
   },
   {
     id: "externalIP",
     accessorKey: "externalIP",
     header: "External IP",
-    cell: ({ row }) => truncated(row.original.externalIP, "max-w-56"),
+    cell: ({ row }) => machineCell(row.original.externalIP),
   },
   {
     id: "ports",
     accessorKey: "ports",
     header: "Ports",
-    cell: ({ row }) => truncated(row.original.ports, "max-w-56"),
+    cell: ({ row }) => machineCell(row.original.ports),
   },
   {
     id: "age",

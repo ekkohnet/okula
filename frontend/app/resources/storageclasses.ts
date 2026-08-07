@@ -1,7 +1,7 @@
 import type { TableColumn } from "@nuxt/ui";
 
 import type { ResourceDef, ResourceRow } from "./types";
-import { nameCell, ageCell, textOrDash, truncated } from "./columns";
+import { nameCell, ageCell, textOrDash, machineCell } from "./columns";
 
 export interface StorageClassRow extends ResourceRow {
   provisioner: string;
@@ -22,7 +22,7 @@ const columns: TableColumn<StorageClassRow>[] = [
     id: "provisioner",
     accessorKey: "provisioner",
     header: "Provisioner",
-    cell: ({ row }) => truncated(row.original.provisioner, "max-w-72"),
+    cell: ({ row }) => machineCell(row.original.provisioner, "max-w-72"),
   },
   { id: "reclaimPolicy", accessorKey: "reclaimPolicy", header: "Reclaim" },
   { id: "bindingMode", accessorKey: "bindingMode", header: "Binding Mode" },

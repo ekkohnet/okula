@@ -2,7 +2,7 @@ import type { TableColumn } from "@nuxt/ui";
 
 import type { ResourceDef, ResourceRow } from "./types";
 import type { Severity } from "./columns";
-import { nameCell, ageCell, dimZero, textOrDash, severityBadge } from "./columns";
+import { nameCell, ageCell, dimZero, textOrDash, severityBadge, machineCell } from "./columns";
 
 export interface NodeRow extends ResourceRow {
   status: string;
@@ -38,7 +38,7 @@ const columns: TableColumn<NodeRow>[] = [
     id: "internalIP",
     accessorKey: "internalIP",
     header: "Internal IP",
-    cell: ({ row }) => textOrDash(row.original.internalIP),
+    cell: ({ row }) => machineCell(row.original.internalIP, "max-w-36"),
   },
   {
     id: "taints",

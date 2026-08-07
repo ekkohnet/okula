@@ -6,7 +6,7 @@ import { UButton, UTooltip, PodSummary } from "#components";
 
 import type { ResourceDef, ResourceRow } from "./types";
 import type { Severity } from "./columns";
-import { nameCell, ageCell, dimZero, textOrDash, severityBadge } from "./columns";
+import { nameCell, ageCell, dimZero, severityBadge, machineCell } from "./columns";
 
 export interface PodRow extends ResourceRow {
   namespace: string;
@@ -46,13 +46,13 @@ const columns: TableColumn<PodRow>[] = [
     id: "ip",
     accessorKey: "ip",
     header: "IP",
-    cell: ({ row }) => textOrDash(row.original.ip),
+    cell: ({ row }) => machineCell(row.original.ip, "max-w-36"),
   },
   {
     id: "node",
     accessorKey: "node",
     header: "Node",
-    cell: ({ row }) => textOrDash(row.original.node),
+    cell: ({ row }) => machineCell(row.original.node),
   },
   {
     id: "age",
@@ -70,7 +70,8 @@ const columns: TableColumn<PodRow>[] = [
           icon: "i-lucide-scroll-text",
           color: "neutral",
           variant: "ghost",
-          class: "ml-auto size-5",
+          // Revealed by row hover; the tr carries the group class.
+          class: "ml-auto size-5 opacity-0 group-hover:opacity-100 transition-opacity",
           "aria-label": "View logs",
           onClick: (e: MouseEvent) => {
             // Keep the action from also triggering the row's detail click.

@@ -47,6 +47,18 @@ export function ageCell(timestamp: number): VNode {
   return h(TimeAgo, { timestamp });
 }
 
+// machineCell renders a machine string (IP, host, node name, ports) in the
+// grid's bare-mono grammar; dimmed dash when empty. The pill form of the
+// grammar belongs to isolated contexts (detail strips), not dense grids.
+export function machineCell(value: string | null | undefined, widthClass = "max-w-56"): VNode {
+  if (!value) return h("span", { class: "text-dimmed" }, "—");
+  return h(
+    "span",
+    { class: `font-mono text-xs text-toned block truncate ${widthClass}`, title: value },
+    value,
+  );
+}
+
 // truncated caps a potentially long value, with the full text on hover.
 // Multi-line rendering for lists (e.g. ingress hosts) is later polish.
 export function truncated(value: string | null | undefined, widthClass = "max-w-64"): VNode {
