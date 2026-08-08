@@ -4,10 +4,10 @@ import type { PodRow } from "~/resources/pods";
 import { severityColor } from "~/resources/columns";
 import { projectPodView } from "~/utils/podView";
 
-// The pod detail page, built to the /design/pod mock's spec. Fetch-once
-// for now (live object/events is a later piece); Metrics and the other
-// header actions arrive with their own pieces. Strip facts come from
-// useResourceObject's `row` (freshest of this fetch / live list row /
+// The pod detail page, built to the /design/pod mock's spec. Object and
+// events stay fresh via useResourceObject's watch session; Metrics and
+// the other header actions arrive with their own pieces. Strip facts come
+// from `row` (freshest of live push / this mount's fetch / live list row /
 // session cache); everything else from the projected object.
 
 const props = defineProps<{
@@ -19,7 +19,7 @@ const props = defineProps<{
 const route = useRoute();
 const kindSlug = String(route.params.kind);
 
-const { row, detail, events, error, showLoading, eventsLoading, eventsError } =
+const { row, detail, events, error, showLoading, eventsLoading, eventsError, deleted } =
   useResourceObject<PodRow>(props.def, props.namespace, props.name);
 
 const view = computed(() => (detail.value ? projectPodView(detail.value.object) : null));
@@ -38,10 +38,12 @@ const railSectionClass = "rounded-md border border-default bg-elevated/25 p-4";
       :back-fallback="`/resources/${kindSlug}`"
     >
       <template #actions>
+        <!-- A deleted pod has no logs endpoint left to stream from. -->
         <UButton
           icon="i-lucide-scroll-text"
           color="neutral"
           variant="soft"
+          :disabled="deleted"
           @click="navigateTo(`/resources/pods/${namespace}/${name}/logs`)"
         >
           Logs
@@ -85,8 +87,13 @@ const railSectionClass = "rounded-md border border-default bg-elevated/25 p-4";
             <div>
               <p class="text-xs text-muted mb-1.5">Status</p>
               <div class="flex items-center h-6">
+                <!-- A tombstone's current status is Deleted; its final
+                projected status (SIGTERM'd containers read as Error)
+                stays visible in the container cards, where it is
+                container history rather than a claim about the pod. -->
+                <UBadge v-if="deleted" color="neutral" variant="soft" size="sm">Deleted</UBadge>
                 <UBadge
-                  v-if="row.status"
+                  v-else-if="row.status"
                   :color="row.statusSeverity ? severityColor[row.statusSeverity] : 'neutral'"
                   variant="soft"
                   size="sm"
@@ -201,6 +208,12 @@ const railSectionClass = "rounded-md border border-default bg-elevated/25 p-4";
         <div v-if="!view && showLoading" class="flex justify-center pt-12">
           <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-dimmed" />
         </div>
+
+        <!-- Deleted with no tombstone: nothing to show and no strip to
+        carry the Deleted badge. -->
+        <p v-else-if="!view && deleted" class="pt-12 text-center text-sm text-dimmed">
+          Nothing by this name exists in the cluster.
+        </p>
 
         <!-- Main + rail -->
         <div

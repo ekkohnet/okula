@@ -50,8 +50,12 @@ func (svc *Service) GetResourceEvents(ctx context.Context, namespace, uid string
 	for i := range list.Items {
 		events = append(events, projectEvent(&list.Items[i]))
 	}
-	sort.Slice(events, func(i, j int) bool { return events[i].LastSeen > events[j].LastSeen })
+	sortEventsNewestFirst(events)
 	return events, nil
+}
+
+func sortEventsNewestFirst(events []ObjectEvent) {
+	sort.Slice(events, func(i, j int) bool { return events[i].LastSeen > events[j].LastSeen })
 }
 
 // projectEvent flattens the two generations of event timestamp/count fields

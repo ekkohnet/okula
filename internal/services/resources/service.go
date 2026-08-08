@@ -30,13 +30,19 @@ type Service struct {
 	connCtx    context.Context
 	connCancel context.CancelFunc
 	watchers   map[string]*watcher
+
+	// Per-detail-page object watch sessions, keyed by caller-supplied id.
+	// Their contexts derive from connCtx, so a connection change ends
+	// them all; each removes itself from the map on exit.
+	objectSessions map[string]*objectSession
 }
 
 func NewService(args ServiceArgs) *Service {
 	return &Service{
-		log:      args.Log,
-		cluster:  args.Cluster,
-		watchers: make(map[string]*watcher),
+		log:            args.Log,
+		cluster:        args.Cluster,
+		watchers:       make(map[string]*watcher),
+		objectSessions: make(map[string]*objectSession),
 	}
 }
 

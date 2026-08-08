@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ekkohnet/okula/internal/services/cluster"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
@@ -44,35 +46,37 @@ func (svc *Service) GetResourceObject(ctx context.Context, key, namespace, name 
 		return ObjectDetail{}, fmt.Errorf("no active cluster connection")
 	}
 
-	ref := name
-	if def.Namespaced {
-		ref = namespace + "/" + name
-	}
+	ref := objectRef(def, namespace, name)
 
 	ctx, cancel := context.WithTimeout(ctx, getObjectTimeout)
 	defer cancel()
 
-	var ri dynamic.ResourceInterface = conn.Dynamic.Resource(def.GVR)
-	if def.Namespaced {
-		ri = conn.Dynamic.Resource(def.GVR).Namespace(namespace)
-	}
-
-	obj, err := ri.Get(ctx, name, metav1.GetOptions{})
+	obj, err := resourceInterface(conn, def, namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return ObjectDetail{}, fmt.Errorf("get %s %s: %w", key, ref, err)
 	}
 
+	detail, err := projectDetail(def, obj)
+	if err != nil {
+		return ObjectDetail{}, fmt.Errorf("%s %s: %w", key, ref, err)
+	}
+	return detail, nil
+}
+
+// projectDetail builds the detail payload from a full object — shared by the
+// on-demand GET and the object watch session's pushes.
+func projectDetail(def Definition, obj *unstructured.Unstructured) (ObjectDetail, error) {
 	// managedFields is noise in a read view; kubectl hides it too.
 	unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
 
 	row, err := def.ProjectRow(obj)
 	if err != nil {
-		return ObjectDetail{}, fmt.Errorf("project %s %s: %w", key, ref, err)
+		return ObjectDetail{}, fmt.Errorf("project row: %w", err)
 	}
 
 	out, err := yaml.Marshal(obj.Object)
 	if err != nil {
-		return ObjectDetail{}, fmt.Errorf("marshal %s %s: %w", key, ref, err)
+		return ObjectDetail{}, fmt.Errorf("marshal yaml: %w", err)
 	}
 
 	return ObjectDetail{
@@ -81,4 +85,20 @@ func (svc *Service) GetResourceObject(ctx context.Context, key, namespace, name 
 		Object: obj.Object,
 		Row:    row,
 	}, nil
+}
+
+// resourceInterface scopes the dynamic client for a definition; namespace is
+// ignored for cluster-scoped resources.
+func resourceInterface(conn *cluster.ConnectionHandle, def Definition, namespace string) dynamic.ResourceInterface {
+	if def.Namespaced {
+		return conn.Dynamic.Resource(def.GVR).Namespace(namespace)
+	}
+	return conn.Dynamic.Resource(def.GVR)
+}
+
+func objectRef(def Definition, namespace, name string) string {
+	if def.Namespaced {
+		return namespace + "/" + name
+	}
+	return name
 }

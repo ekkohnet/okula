@@ -59,3 +59,31 @@ export function SubscribeResource(key: string): $CancellablePromise<void> {
 export function UnsubscribeResource(key: string): $CancellablePromise<void> {
     return $Call.ByID(2900005223, key);
 }
+
+/**
+ * UnwatchResourceObject ends an object watch session. Harmless for a session
+ * already ended by a cluster switch.
+ */
+export function UnwatchResourceObject(id: string): $CancellablePromise<void> {
+    return $Call.ByID(3332070227, id);
+}
+
+/**
+ * WatchResourceObject fetches an object's current state (the same payload as
+ * GetResourceObject) and starts a session that keeps it fresh: a dedicated
+ * per-object watch pushes ResourceObjectUpdated:{id} (full ObjectDetail) and
+ * ResourceObjectDeleted:{id} (final state) events, and an events watch keyed
+ * by the object's UID pushes ResourceObjectEvents:{id} (the full projected
+ * list), until UnwatchResourceObject or a cluster switch ends the session.
+ * The caller supplies the session id and must register its event handlers
+ * before calling — pushes begin the moment the session exists, and the first
+ * events push is what resolves that section's loading state.
+ * An absent object is a state, not an error: the zero ObjectDetail comes
+ * back and the session watches the name, so a later creation arrives as an
+ * ordinary update push.
+ * Deliberately never the informer caches — those are stripped/partial by
+ * design and can never back a detail view.
+ */
+export function WatchResourceObject(key: string, $namespace: string, name: string, watchId: string): $CancellablePromise<$models.ObjectDetail> {
+    return $Call.ByID(2439667058, key, $namespace, name, watchId);
+}

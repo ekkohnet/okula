@@ -16,7 +16,11 @@ const props = defineProps<{
 const route = useRoute();
 const kindSlug = String(route.params.kind);
 
-const { detail, error } = useResourceObject<ResourceRow>(props.def, props.namespace, props.name);
+const { detail, error, deleted } = useResourceObject<ResourceRow>(
+  props.def,
+  props.namespace,
+  props.name,
+);
 
 const manifestOpen = ref(false);
 
@@ -48,6 +52,16 @@ const breadcrumb = computed(() => [
     </PageHeader>
 
     <ManifestSlideover v-model:open="manifestOpen" :yaml="detail?.yaml ?? ''" :title="name" />
+
+    <!-- No strip yet to carry a Deleted badge (that arrives with the
+    generic baseline), so deletion gets a plain line. -->
+    <p v-if="deleted" class="text-sm text-dimmed">
+      {{
+        detail
+          ? "This object was deleted; the manifest shows its last known state."
+          : "Nothing by this name exists in the cluster."
+      }}
+    </p>
 
     <!-- The page has no content to fall back on, so a failed fetch is the
     one thing it must say out loud. -->

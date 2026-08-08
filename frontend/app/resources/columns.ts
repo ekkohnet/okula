@@ -12,7 +12,7 @@ export type Severity = "ok" | "pending" | "warn" | "error";
 // absorbs window resizing. Kind-specific columns declare theirs inline.
 export const colw = {
   namespace: "w-56",
-  status: "w-36",
+  status: "w-44",
   age: "w-34",
   ready: "w-20",
   restarts: "w-24",
