@@ -62,11 +62,6 @@ onBeforeUnmount(() => clearTimeout(copyTimer));
     :overlay="false"
     :modal="false"
     dismissible
-    :content="{
-      // Same reasoning as the catalog slideover: interacting with the page
-      // behind must not dismiss the panel.
-      onInteractOutside: (e: Event) => e.preventDefault(),
-    }"
     :ui="{ body: 'flex flex-col p-0 sm:p-0' }"
   >
     <template #body>
