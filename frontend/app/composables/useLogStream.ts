@@ -73,6 +73,9 @@ export function useLogStream() {
   }
 
   async function stop() {
+    // Invalidate any in-flight start(): its snapshot goes stale, so a
+    // session resolving after this point is discarded, not leaked.
+    generation++;
     offChunk?.();
     offChunk = null;
     offEnded?.();
@@ -92,8 +95,10 @@ export function useLogStream() {
   }
 
   async function start(opts: LogStreamStart) {
-    const gen = ++generation;
+    // Snapshot after stop()'s bump — each start gets a unique value, so
+    // of overlapping starts only the latest passes the checks below.
     await stop();
+    const gen = ++generation;
 
     lines.value = [];
     truncated.value = false;
