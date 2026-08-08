@@ -26,6 +26,12 @@ const view = computed(() => (detail.value ? projectPodView(detail.value.object) 
 
 const manifestOpen = ref(false);
 
+// Seeds the log viewer with this pod as a bare (all-containers) source.
+const logsTo = computed(() => ({
+  path: "/logs",
+  query: { src: formatLogSource({ kind: "pod", namespace: props.namespace, pod: props.name }) },
+}));
+
 const railSectionClass = "rounded-md border border-default bg-elevated/25 p-4";
 </script>
 
@@ -44,7 +50,7 @@ const railSectionClass = "rounded-md border border-default bg-elevated/25 p-4";
           color="neutral"
           variant="soft"
           :disabled="deleted"
-          @click="navigateTo(`/resources/pods/${namespace}/${name}/logs`)"
+          @click="navigateTo(logsTo)"
         >
           Logs
         </UButton>

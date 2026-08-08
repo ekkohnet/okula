@@ -1,23 +1,15 @@
 <script setup lang="ts">
-const route = useRoute();
-
-const namespace = computed(() => String(route.params.namespace ?? ""));
-const pod = computed(() => String(route.params.pod ?? ""));
+// Dissolved into the /logs destination. The stub keeps old addresses
+// (session restore, stale history) landing on the viewer; safe to
+// delete once no session can hold this route. Names are DNS-1123, so
+// the literal src needs no escaping (mirrors formatLogSource).
+definePageMeta({
+  middleware: [
+    (to) => navigateTo(`/logs?src=pod:${to.params.namespace}/${to.params.pod}`, { replace: true }),
+  ],
+});
 </script>
 
 <template>
-  <div class="h-full min-h-0 flex flex-col">
-    <PageHeader
-      :title="pod"
-      copy-title
-      :breadcrumb="[
-        { label: 'Pods', to: '/resources/pods' },
-        { label: namespace },
-        { label: 'Logs' },
-      ]"
-      back-fallback="/resources/pods"
-    />
-
-    <LogViewer :key="`${namespace}/${pod}`" :namespace="namespace" :pod="pod" class="flex-1" />
-  </div>
+  <div />
 </template>

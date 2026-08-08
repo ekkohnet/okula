@@ -2,11 +2,15 @@
 import { GetPodContainers } from "#services/logs/service";
 import type { PodContainers } from "#services/logs/models";
 
+import type { PodLogSource } from "~/utils/logSources";
+
 const props = defineProps<{
-  namespace: string;
-  pod: string;
-  container?: string;
+  source: PodLogSource;
 }>();
+
+// Narrowing (picking a container) is an address change; the page owns
+// the URL, so it goes up as an event.
+const emit = defineEmits<{ narrow: [container: string] }>();
 
 const { lines, running, ended, endedError, startError, truncated, status, statusReason, start } =
   useLogStream();
@@ -61,8 +65,8 @@ function formatTime(t: number): string {
 function restart() {
   if (!selectedContainer.value) return;
   start({
-    namespace: props.namespace,
-    pod: props.pod,
+    namespace: props.source.namespace,
+    pod: props.source.pod,
     container: selectedContainer.value,
     previous: previous.value,
   });
@@ -70,19 +74,35 @@ function restart() {
 
 onMounted(async () => {
   try {
-    containers.value = await GetPodContainers(props.namespace, props.pod);
+    containers.value = await GetPodContainers(props.source.namespace, props.source.pod);
   } catch {
+    // An addressed container can still stream (e.g. the pod GET is
+    // denied but logs aren't); only the picker loses its items.
     containers.value = null;
-    return;
   }
   selectedContainer.value =
-    props.container ||
+    props.source.container ||
     containers.value?.containers?.[0] ||
     containers.value?.initContainers?.[0] ||
     "";
 });
 
 watch([selectedContainer, previous], () => restart());
+
+// The selection is the address: the initial default pick and dropdown
+// changes both surface as a narrow, keeping the URL truthful.
+watch(selectedContainer, (c) => {
+  if (c && c !== props.source.container) emit("narrow", c);
+});
+
+// External address changes sync back into the picker (rare — pod
+// changes remount via the page's key, narrows round-trip as no-ops).
+watch(
+  () => props.source.container,
+  (c) => {
+    if (c && c !== selectedContainer.value) selectedContainer.value = c;
+  },
+);
 
 // --- Sticky-bottom follow ---
 
