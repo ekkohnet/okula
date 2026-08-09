@@ -298,9 +298,10 @@ const virtualizer = useVirtualizer(
     getScrollElement: () => scrollEl.value,
     estimateSize: () => LINE_HEIGHT,
     overscan: 20,
-    // Fallback for a stale-range tick must not collide with real
-    // (positive) line ids — duplicate v-for keys corrupt the patch.
-    getItemKey: (index: number) => visibleView.value.lines[index]?.id ?? -(index + 1),
+    // Fallback for a stale-range tick must not collide with real line
+    // ids (positive lines, negative gap markers) — duplicate v-for
+    // keys corrupt the patch.
+    getItemKey: (index: number) => visibleView.value.lines[index]?.id ?? `f-${index}`,
   })),
 );
 
@@ -392,7 +393,14 @@ function onScroll() {
 
 function pause() {
   pinned.value = false;
-  frozen.value = { rev: view.value.rev, lines: view.value.lines.slice() };
+  // Gap markers mutate in place on the live buffer; the snapshot takes
+  // its own copies so it shows the loss as of the pause — a live count
+  // would contradict the frozen lines still on screen (it counts
+  // evictions of exactly what the snapshot retains).
+  frozen.value = {
+    rev: view.value.rev,
+    lines: view.value.lines.map((l) => (l.marker === "gap" ? { ...l } : l)),
+  };
 }
 
 function jumpToBottom() {
@@ -557,7 +565,7 @@ defineExpose({ paused, clear: clearOutput });
             :key="s.key"
             class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-xs bg-elevated/50 hover:bg-elevated transition-colors cursor-pointer"
             :class="hidden.has(s.key) ? 'opacity-50' : ''"
-            :title="s.startError ?? s.key"
+            :title="s.startError ?? s.endedError ?? s.key"
             @click="toggleStream(s.key)"
           >
             <span
@@ -572,6 +580,13 @@ defineExpose({ paused, clear: clearOutput });
             <UIcon
               v-else-if="s.startError"
               name="i-lucide-triangle-alert"
+              class="size-3 text-error"
+            />
+            <!-- Ended with an error is not a clean end: error tint,
+            message in the tooltip. -->
+            <UIcon
+              v-else-if="s.ended && s.endedError"
+              name="i-lucide-circle-alert"
               class="size-3 text-error"
             />
             <UIcon
@@ -620,10 +635,26 @@ defineExpose({ paused, clear: clearOutput });
             :style="{ height: `${virtualizer.getTotalSize()}px`, minWidth: paneMinWidth }"
           >
             <template v-for="row in virtualRows" :key="row.key">
+              <!-- Gap divider: lines lost to eviction or transport
+              drops, dashed to distinguish from restarts. -->
+              <div
+                v-if="row.line.marker === 'gap'"
+                class="absolute top-0 left-0 w-full h-5 flex items-center gap-3 select-none"
+                :style="{ transform: `translateY(${row.start}px)` }"
+              >
+                <span class="flex-1 border-t border-dashed border-default" />
+                <span class="text-dimmed"
+                  ><span :style="{ color: streamMeta.get(row.line.stream)?.color }">{{
+                    streamMeta.get(row.line.stream)?.container
+                  }}</span>
+                  — {{ row.line.evicted?.toLocaleString() }} lines evicted</span
+                >
+                <span class="flex-1 border-t border-dashed border-default" />
+              </div>
               <!-- Restart divider, stream-attributed; no timestamp
               column, spans the pane width. -->
               <div
-                v-if="row.line.marker === 'restart'"
+                v-else-if="row.line.marker === 'restart'"
                 class="absolute top-0 left-0 w-full h-5 flex items-center gap-3 select-none"
                 :style="{ transform: `translateY(${row.start}px)` }"
               >

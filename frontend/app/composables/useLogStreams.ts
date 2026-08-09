@@ -89,26 +89,35 @@ export function useLogStreams() {
 
   // --- Arrival path: enqueue per chunk, flush once per frame ---
 
-  let pending: { rec: StreamRecord; lines: IncomingLine[] }[] = [];
+  let pending: { rec: StreamRecord; lines: IncomingLine[]; dropped: number }[] = [];
   let pendingCount = 0;
   let rafId: number | null = null;
+  // Lines lost to pending-queue overflow (hidden window) fold into the
+  // owning stream's gap total at the next flush.
+  const asideDropped = new Map<string, number>();
 
-  function enqueue(rec: StreamRecord, incoming: IncomingLine[]) {
-    if (!incoming?.length) return;
-    pending.push({ rec, lines: incoming });
-    pendingCount += incoming.length;
+  function enqueue(rec: StreamRecord, incoming: IncomingLine[], dropped = 0) {
+    if (!incoming?.length && !dropped) return;
+    pending.push({ rec, lines: incoming ?? [], dropped });
+    pendingCount += incoming?.length ?? 0;
     // Ring-cap the queue: with rAF suspended (hidden window) it can't
     // grow unbounded, and the overflow would be evicted on insert
-    // anyway.
+    // anyway — but it still counts as loss.
     while (pendingCount > MAX_LOG_LINES * 2 && pending.length > 1) {
-      pendingCount -= pending.shift()!.lines.length;
+      const shed = pending.shift()!;
+      pendingCount -= shed.lines.length;
+      asideDropped.set(
+        shed.rec.key,
+        (asideDropped.get(shed.rec.key) ?? 0) + shed.lines.length + shed.dropped,
+      );
     }
     if (rafId === null) rafId = requestAnimationFrame(flush);
   }
 
   function flush() {
     rafId = null;
-    if (!pending.length) return;
+    if (!pending.length && !asideDropped.size) return;
+    const t0 = perfEnabled() ? performance.now() : 0;
     const chunks = pending;
     pending = [];
     pendingCount = 0;
@@ -132,8 +141,24 @@ export function useLogStreams() {
     // per stream), cross-stream ties keep arrival order.
     batch.sort((a, b) => a.ot - b.ot);
     buffer.insert(batch);
+    for (const { rec, dropped } of chunks) {
+      if (dropped) buffer.recordDropped(rec.key, dropped);
+    }
+    if (asideDropped.size) {
+      for (const [key, n] of asideDropped) buffer.recordDropped(key, n);
+      asideDropped.clear();
+    }
     maxLineLength.value = widest;
     publishView();
+
+    if (t0) {
+      const ms = performance.now() - t0;
+      if (ms > 8) {
+        debugLog(
+          `flush ${batch.length} lines in ${ms.toFixed(1)}ms (buffer ${buffer.lines.length})`,
+        );
+      }
+    }
   }
 
   // --- Session lifecycle ---
@@ -148,6 +173,7 @@ export function useLogStreams() {
     rafId = null;
     pending = [];
     pendingCount = 0;
+    asideDropped.clear();
     clearInterval(silenceTimer);
     silenceTimer = undefined;
 
@@ -236,7 +262,7 @@ export function useLogStreams() {
         rec.lastChunkAt = Date.now();
         rec.silenceLogged = false;
         const chunk = ev?.data ?? ev;
-        enqueue(rec, chunk?.lines ?? []);
+        enqueue(rec, chunk?.lines ?? [], chunk?.dropped ?? 0);
       }),
     );
     rec.offs.push(
@@ -293,6 +319,7 @@ export function useLogStreams() {
   function clear() {
     pending = [];
     pendingCount = 0;
+    asideDropped.clear();
     buffer.clear();
     maxLineLength.value = 0;
     publishView();

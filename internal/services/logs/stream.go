@@ -86,6 +86,10 @@ type LogLine struct {
 
 type LogChunk struct {
 	Lines []LogLine `json:"lines"`
+	// Dropped counts lines the ring cap discarded since the previous
+	// chunk — they could never have survived to a paint, but the count
+	// keeps the viewer's gap markers honest.
+	Dropped int `json:"dropped,omitempty"`
 }
 
 type LogStreamEnded struct {
@@ -255,15 +259,18 @@ func (svc *Service) pumpStream(ctx context.Context, stream io.Reader, sess *sess
 	// emitted slice is never reused (fresh backing each flush) in case
 	// the emit marshals asynchronously.
 	batch := make([]LogLine, 0, 256)
+	dropped := 0
 	flush := func() {
-		if len(batch) == 0 {
+		if len(batch) == 0 && dropped == 0 {
 			return
 		}
 		if len(batch) > flushRingCap {
+			dropped += len(batch) - flushRingCap
 			batch = batch[len(batch)-flushRingCap:]
 		}
-		application.Get().Event.Emit("LogChunk:"+sess.id, LogChunk{Lines: batch})
+		application.Get().Event.Emit("LogChunk:"+sess.id, LogChunk{Lines: batch, Dropped: dropped})
 		batch = make([]LogLine, 0, 256)
+		dropped = 0
 	}
 
 	ticker := time.NewTicker(flushInterval)
@@ -286,6 +293,7 @@ func (svc *Service) pumpStream(ctx context.Context, stream io.Reader, sess *sess
 			batch = append(batch, line)
 			// Ring-trim between flushes; 2x hysteresis amortizes the copy.
 			if len(batch) >= 2*flushRingCap {
+				dropped += len(batch) - flushRingCap
 				batch = append(batch[:0], batch[len(batch)-flushRingCap:]...)
 			}
 		case <-ticker.C:
