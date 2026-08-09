@@ -1,49 +1,113 @@
 <script setup lang="ts">
 import { GetPodContainers } from "#services/logs/service";
-import type { PodContainers } from "#services/logs/models";
 
 import { useVirtualizer } from "@tanstack/vue-virtual";
 
 import type { BufferView } from "~/utils/logBuffer";
 import type { PodLogSource } from "~/utils/logSources";
 
+// The multi-stream log viewer (ui-redesign piece 6d2): a bare pod
+// source fans out to every container, one backend session per stream,
+// merged by timestamp into one pane. Chips carry per-stream status and
+// visibility; colored prefixes carry line identity. The page keys this
+// component by the full source string — a source change is a fresh
+// mount.
+
 const props = defineProps<{
   source: PodLogSource;
 }>();
 
-// Narrowing (picking a container) is an address change; the page owns
-// the URL, so it goes up as an event.
-const emit = defineEmits<{ narrow: [container: string] }>();
-
 const { view, streams, maxLineLength, open } = useLogStreams();
 
-// Single-stream parity (piece 6d1): the manager runs one stream, so
-// the toolbar badges and banners read the first record. Chips replace
-// this in 6d2.
-const primary = computed(() => streams.value[0]);
-const running = computed(() => primary.value?.running ?? false);
-const ended = computed(() => primary.value?.ended ?? false);
-const endedError = computed(() => primary.value?.endedError ?? null);
-const startError = computed(() => primary.value?.startError ?? null);
-const status = computed(() => primary.value?.status ?? "live");
-const statusReason = computed(() => primary.value?.statusReason ?? null);
+// --- Resolution: source -> stream set ---
 
-const containers = ref<PodContainers | null>(null);
-const selectedContainer = ref("");
-const previous = ref(false);
+const resolving = ref(false);
+const resolveError = ref<string | null>(null);
+
+async function openSource() {
+  pinned.value = true;
+  frozen.value = null;
+  const { namespace, pod, container } = props.source;
+  if (container) {
+    open([{ namespace, pod, container }]);
+    return;
+  }
+  resolving.value = true;
+  resolveError.value = null;
+  try {
+    const pc = await GetPodContainers(namespace, pod);
+    // Main containers first, then init (native sidecars ride the init
+    // list) — the order assigns palette slots and chip positions.
+    const names = [...(pc.containers ?? []), ...(pc.initContainers ?? [])];
+    if (!names.length) throw new Error(`pod ${namespace}/${pod} has no containers`);
+    open(names.map((container) => ({ namespace, pod, container })));
+  } catch (err) {
+    resolveError.value = toErrorString(err);
+  } finally {
+    resolving.value = false;
+  }
+}
+
+onMounted(openSource);
+
+// --- Aggregate stream state ---
+
+const anyRunning = computed(() => streams.value.some((s) => s.running));
+const allEnded = computed(() => streams.value.length > 0 && streams.value.every((s) => s.ended));
+const allFailed = computed(
+  () => streams.value.length > 0 && streams.value.every((s) => s.startError),
+);
+const endedError = computed(() => streams.value.find((s) => s.endedError)?.endedError ?? null);
+const startError = computed(
+  () => resolveError.value ?? streams.value.find((s) => s.startError)?.startError ?? null,
+);
+
+// --- Stream identity: prefixes and colors ---
+
+// Shortest-unambiguous prefixes: container only while every stream
+// shares one pod, pod/container once pods differ. A single source is
+// always one pod today; the rule is ready for multi-source.
+const multiPod = computed(() => new Set(streams.value.map((s) => s.pod)).size > 1);
+
+const streamMeta = computed(() => {
+  const meta = new Map<string, { prefix: string; container: string; color: string }>();
+  streams.value.forEach((s, i) => {
+    meta.set(s.key, {
+      prefix: multiPod.value ? `${s.pod}/${s.container}` : s.container,
+      container: s.container,
+      color: SERIES_COLORS[i % SERIES_COLORS.length]!,
+    });
+  });
+  return meta;
+});
+
+// Gutter sized to the longest prefix on show, bounded so one absurd
+// name can't take half the pane.
+const gutterCh = computed(() => {
+  let n = 0;
+  for (const s of streams.value) {
+    if (hidden.value.has(s.key)) continue;
+    const m = streamMeta.value.get(s.key);
+    if (m) n = Math.max(n, m.prefix.length);
+  }
+  return Math.min(n, 44);
+});
+
+// --- View settings and visibility ---
+
 const showTimestamps = ref(true);
+const alignedGutter = ref(false);
 const filter = ref("");
 
-const containerItems = computed(() => {
-  const items = (containers.value?.containers ?? []).map((name) => ({
-    label: name,
-    value: name,
-  }));
-  for (const name of containers.value?.initContainers ?? []) {
-    items.push({ label: `${name} (init)`, value: name });
-  }
-  return items;
-});
+// Hide is display-only: hidden streams keep buffering, so re-showing
+// has history.
+const hidden = ref(new Set<string>());
+function toggleStream(key: string) {
+  const next = new Set(hidden.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  hidden.value = next;
+}
 
 // Unpinning freezes the view: the pane renders this snapshot while new
 // chunks land in the buffer behind it. A bounded ring can't keep both
@@ -60,11 +124,16 @@ const displayView = computed(() => frozen.value ?? view.value);
 const visibleView = computed<BufferView>(() => {
   const dv = displayView.value;
   const needle = filter.value.trim().toLowerCase();
-  if (!needle) return dv;
+  const hid = hidden.value;
+  if (!needle && !hid.size) return dv;
   // A filtered view is a search — markers without their surrounding lines are noise.
   return {
     rev: dv.rev,
-    lines: dv.lines.filter((line) => !line.marker && line.text.toLowerCase().includes(needle)),
+    lines: dv.lines.filter((line) => {
+      if (hid.has(line.stream)) return false;
+      if (needle) return !line.marker && line.text.toLowerCase().includes(needle);
+      return true;
+    }),
   };
 });
 
@@ -79,53 +148,6 @@ const timeFormat = new Intl.DateTimeFormat(undefined, {
 function formatTime(t: number): string {
   return t ? timeFormat.format(t) : "";
 }
-
-function restart() {
-  if (!selectedContainer.value) return;
-  // A fresh stream follows from the start, whatever the old view did.
-  pinned.value = true;
-  frozen.value = null;
-  open([
-    {
-      namespace: props.source.namespace,
-      pod: props.source.pod,
-      container: selectedContainer.value,
-      previous: previous.value,
-    },
-  ]);
-}
-
-onMounted(async () => {
-  try {
-    containers.value = await GetPodContainers(props.source.namespace, props.source.pod);
-  } catch {
-    // An addressed container can still stream (e.g. the pod GET is
-    // denied but logs aren't); only the picker loses its items.
-    containers.value = null;
-  }
-  selectedContainer.value =
-    props.source.container ||
-    containers.value?.containers?.[0] ||
-    containers.value?.initContainers?.[0] ||
-    "";
-});
-
-watch([selectedContainer, previous], () => restart());
-
-// The selection is the address: the initial default pick and dropdown
-// changes both surface as a narrow, keeping the URL truthful.
-watch(selectedContainer, (c) => {
-  if (c && c !== props.source.container) emit("narrow", c);
-});
-
-// External address changes sync back into the picker (rare — pod
-// changes remount via the page's key, narrows round-trip as no-ops).
-watch(
-  () => props.source.container,
-  (c) => {
-    if (c && c !== selectedContainer.value) selectedContainer.value = c;
-  },
-);
 
 // --- Virtualized pane ---
 
@@ -174,13 +196,15 @@ const virtualRows = computed(() => {
   return rendered;
 });
 
-// Pins the horizontal scroll range to the widest line seen rather than
-// the widest currently rendered, so the scrollbar doesn't jitter as the
-// window slides. ch is exact for the mono font (tabs excepted — a too
-// short spacer only shortens the scrollbar, nothing clips).
+// Pins the horizontal scroll range to the widest line seen (plus the
+// prefix and timestamp columns) rather than the widest currently
+// rendered, so the scrollbar doesn't jitter as the window slides. ch is
+// exact for the mono font (tabs excepted — a too short spacer only
+// shortens the scrollbar, nothing clips).
 const paneMinWidth = computed(() => {
   if (!maxLineLength.value) return undefined;
-  return `${maxLineLength.value + (showTimestamps.value ? TIMESTAMP_CH : 0)}ch`;
+  const prefix = gutterCh.value ? gutterCh.value + 2 : 0;
+  return `${maxLineLength.value + prefix + (showTimestamps.value ? TIMESTAMP_CH : 0)}ch`;
 });
 
 // --- Sticky-bottom follow ---
@@ -251,25 +275,18 @@ watch(view, () => {
 
 <template>
   <div class="h-full min-h-0 flex flex-col">
-    <!-- Toolbar -->
+    <!-- Toolbar (piece 6d3 reshapes this to the settled design) -->
     <div class="flex items-center gap-4 mb-4">
-      <USelect
-        v-model="selectedContainer"
-        :items="containerItems"
-        icon="i-lucide-container"
-        size="md"
-        class="min-w-56 ring-default"
-        :disabled="!containerItems.length"
-        aria-label="Container"
-      />
-
       <USwitch v-model="showTimestamps" label="Timestamps" size="sm" />
-      <USwitch v-model="previous" label="Previous" size="sm" />
+      <USwitch v-model="alignedGutter" label="Aligned Gutter" size="sm" />
 
       <UInput
         v-model="filter"
         icon="i-lucide-search"
         placeholder="Filter lines..."
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
         class="ml-auto max-w-xs w-full"
         :ui="{ base: 'ring-default', leadingIcon: 'size-4' }"
       />
@@ -287,28 +304,6 @@ watch(view, () => {
         Paused
       </UBadge>
 
-      <!-- Passive indicator: an auto-resuming stream shouldn't look hung. -->
-      <UBadge
-        v-if="status === 'reconnecting'"
-        color="neutral"
-        variant="soft"
-        size="sm"
-        icon="i-lucide-loader-2"
-        :ui="{ leadingIcon: 'animate-spin' }"
-        class="whitespace-nowrap"
-      >
-        Reconnecting...
-      </UBadge>
-      <UBadge
-        v-else-if="status === 'waiting'"
-        color="warning"
-        variant="soft"
-        size="sm"
-        class="whitespace-nowrap"
-      >
-        Waiting<template v-if="statusReason"> — {{ statusReason }}</template>
-      </UBadge>
-
       <!-- Only a filter earns a count: matches are the search result. -->
       <span v-if="filter.trim()" class="text-xs text-muted whitespace-nowrap">
         {{ visibleView.lines.length }}
@@ -316,99 +311,168 @@ watch(view, () => {
       </span>
     </div>
 
-    <!-- Ended / error banners -->
+    <!-- Whole-viewer banners; per-stream trouble stays on the chips. -->
     <div
-      v-if="ended"
+      v-if="allEnded"
       class="flex items-center gap-2 px-3 py-2 mb-2 text-sm border border-default rounded-md bg-elevated/25"
     >
       <UIcon name="i-lucide-circle-slash" class="size-4 text-muted shrink-0" />
       <span
-        >Stream ended<template v-if="endedError">: {{ endedError }}</template></span
+        >{{ streams.length === 1 ? "Stream" : "Streams" }} ended<template v-if="endedError"
+          >: {{ endedError }}</template
+        ></span
       >
-      <UButton size="xs" color="neutral" variant="soft" class="ml-auto" @click="restart">
+      <UButton size="xs" color="neutral" variant="soft" class="ml-auto" @click="openSource">
         Resume
       </UButton>
     </div>
     <div
-      v-else-if="startError"
+      v-else-if="startError && (allFailed || resolveError)"
       class="flex items-center gap-2 px-3 py-2 mb-2 text-sm border border-error/50 rounded-md"
     >
       <UIcon name="i-lucide-triangle-alert" class="size-4 text-error shrink-0" />
       <span>{{ startError }}</span>
-      <UButton size="xs" color="neutral" variant="soft" class="ml-auto" @click="restart">
+      <UButton size="xs" color="neutral" variant="soft" class="ml-auto" @click="openSource">
         Retry
       </UButton>
     </div>
 
-    <!-- Log pane -->
-    <div class="relative flex-1 min-h-0 border border-default rounded-md bg-sunken">
+    <!-- Sources band + pane: the band is the slideover actions-band
+    recipe attached atop the sunken well — label as a fixed left
+    gutter, chips wrapping beside it, pod names whole. -->
+    <div class="flex-1 min-h-0 flex flex-col">
       <div
-        ref="scrollEl"
-        class="h-full overflow-auto font-mono text-xs leading-5 p-3"
-        @scroll.passive="onScroll"
+        class="flex items-start gap-3 px-3 py-2 border border-b-0 border-default rounded-t-md shrink-0"
       >
-        <div
-          v-if="!displayView.lines.length"
-          class="h-full flex items-center justify-center text-dimmed"
-        >
-          {{ running ? "Waiting for logs..." : "No log output." }}
-        </div>
-
-        <div
-          v-else-if="!visibleView.lines.length"
-          class="h-full flex items-center justify-center text-dimmed"
-        >
-          No lines match the filter.
-        </div>
-
-        <!-- Spacer carries the full scroll range (height from the line
-        count, min-width from the widest line); only the virtual window's
-        rows exist in the DOM, absolutely positioned inside it. -->
-        <div
-          v-else
-          class="relative"
-          :style="{ height: `${virtualizer.getTotalSize()}px`, minWidth: paneMinWidth }"
-        >
-          <template v-for="row in virtualRows" :key="row.key">
-            <!-- Restart divider: no timestamp column, spans the pane width. -->
-            <div
-              v-if="row.line.marker === 'restart'"
-              class="absolute top-0 left-0 w-full h-5 flex items-center gap-3 select-none"
-              :style="{ transform: `translateY(${row.start}px)` }"
-            >
-              <span class="flex-1 border-t border-default" />
-              <span class="text-dimmed"
-                >container restarted<template v-if="row.line.exitCode !== undefined">
-                  (exit {{ row.line.exitCode }})</template
-                ></span
-              >
-              <span class="flex-1 border-t border-default" />
-            </div>
-            <div
-              v-else
-              class="absolute top-0 left-0 h-5 whitespace-pre"
-              :style="{ transform: `translateY(${row.start}px)` }"
-            >
-              <span v-if="showTimestamps && row.line.t" class="text-dimmed select-none mr-3">{{
-                formatTime(row.line.t)
-              }}</span
-              >{{ row.line.text }}
-            </div>
-          </template>
+        <SectionTitle class="h-6 flex items-center shrink-0">Sources</SectionTitle>
+        <div class="flex items-center gap-1.5 flex-wrap min-w-0">
+          <button
+            v-for="s in streams"
+            :key="s.key"
+            class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-xs bg-elevated/50 hover:bg-elevated transition-colors cursor-pointer"
+            :class="hidden.has(s.key) ? 'opacity-50' : ''"
+            :title="s.startError ?? s.key"
+            @click="toggleStream(s.key)"
+          >
+            <span
+              class="size-2 rounded-full shrink-0"
+              :style="{ backgroundColor: streamMeta.get(s.key)?.color }"
+            />
+            <span class="font-mono" :class="hidden.has(s.key) ? 'line-through' : ''">
+              {{ s.container }}
+            </span>
+            <span v-if="multiPod" class="font-mono text-dimmed">{{ s.pod }}</span>
+            <UIcon v-if="hidden.has(s.key)" name="i-lucide-eye-off" class="size-3 text-dimmed" />
+            <UIcon
+              v-else-if="s.startError"
+              name="i-lucide-triangle-alert"
+              class="size-3 text-error"
+            />
+            <UIcon
+              v-else-if="s.status === 'reconnecting'"
+              name="i-lucide-loader-2"
+              class="size-3 animate-spin text-muted"
+            />
+            <UIcon
+              v-else-if="s.status === 'waiting'"
+              name="i-lucide-clock"
+              class="size-3 text-warning"
+              :title="s.statusReason ?? undefined"
+            />
+            <UIcon v-else-if="s.ended" name="i-lucide-circle-slash" class="size-3 text-dimmed" />
+          </button>
         </div>
       </div>
 
-      <UButton
-        v-if="!pinned"
-        icon="i-lucide-arrow-down-to-line"
-        size="xs"
-        color="neutral"
-        variant="solid"
-        class="absolute bottom-3 right-4"
-        @click="jumpToBottom"
-      >
-        Latest
-      </UButton>
+      <!-- Log pane -->
+      <div class="relative flex-1 min-h-0 border border-default rounded-b-md bg-sunken">
+        <div
+          ref="scrollEl"
+          class="h-full overflow-auto font-mono text-xs leading-5 p-3"
+          @scroll.passive="onScroll"
+        >
+          <div
+            v-if="!displayView.lines.length"
+            class="h-full flex items-center justify-center text-dimmed"
+          >
+            {{ anyRunning || resolving ? "Waiting for logs..." : "No log output." }}
+          </div>
+
+          <div
+            v-else-if="!visibleView.lines.length"
+            class="h-full flex items-center justify-center text-dimmed"
+          >
+            {{ filter.trim() ? "No lines match the filter." : "All sources hidden." }}
+          </div>
+
+          <!-- Spacer carries the full scroll range (height from the line
+          count, min-width from the widest line); only the virtual window's
+          rows exist in the DOM, absolutely positioned inside it. -->
+          <div
+            v-else
+            class="relative"
+            :style="{ height: `${virtualizer.getTotalSize()}px`, minWidth: paneMinWidth }"
+          >
+            <template v-for="row in virtualRows" :key="row.key">
+              <!-- Restart divider, stream-attributed; no timestamp
+              column, spans the pane width. -->
+              <div
+                v-if="row.line.marker === 'restart'"
+                class="absolute top-0 left-0 w-full h-5 flex items-center gap-3 select-none"
+                :style="{ transform: `translateY(${row.start}px)` }"
+              >
+                <span class="flex-1 border-t border-default" />
+                <span class="text-dimmed"
+                  ><span :style="{ color: streamMeta.get(row.line.stream)?.color }">{{
+                    streamMeta.get(row.line.stream)?.container
+                  }}</span>
+                  restarted<template v-if="row.line.exitCode !== undefined">
+                    (exit {{ row.line.exitCode }})</template
+                  ></span
+                >
+                <span class="flex-1 border-t border-default" />
+              </div>
+              <div
+                v-else
+                class="absolute top-0 left-0 h-5 whitespace-pre"
+                :style="{ transform: `translateY(${row.start}px)` }"
+              >
+                <span v-if="showTimestamps && row.line.t" class="text-dimmed select-none mr-3">{{
+                  formatTime(row.line.t)
+                }}</span
+                ><span
+                  v-if="alignedGutter"
+                  class="inline-block truncate align-bottom select-none mr-3"
+                  :style="{
+                    width: `${gutterCh}ch`,
+                    color: streamMeta.get(row.line.stream)?.color,
+                  }"
+                  :title="row.line.stream"
+                  >{{ streamMeta.get(row.line.stream)?.prefix }}</span
+                ><span
+                  v-else
+                  class="select-none mr-3"
+                  :style="{ color: streamMeta.get(row.line.stream)?.color }"
+                  :title="row.line.stream"
+                  >{{ streamMeta.get(row.line.stream)?.prefix }}</span
+                >{{ row.line.text }}
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <UButton
+          v-if="!pinned"
+          icon="i-lucide-arrow-down-to-line"
+          size="xs"
+          color="neutral"
+          variant="solid"
+          class="absolute bottom-3 right-4"
+          @click="jumpToBottom"
+        >
+          Latest
+        </UButton>
+      </div>
     </div>
   </div>
 </template>
