@@ -17,6 +17,11 @@ const source = computed<LogSource | null>(() => parsed.value.sources[0] ?? null)
 // continuity across source edits buys nothing.
 const viewerKey = computed(() => (source.value ? formatLogSource(source.value) : ""));
 
+// The viewer exposes its paused state and clear() for the header —
+// PageHeader stays page-owned, the badge and Clear button bind through
+// the template ref.
+const viewer = useTemplateRef("viewer");
+
 const podPage = computed(() =>
   source.value ? `/resources/pods/${source.value.namespace}/${source.value.pod}` : null,
 );
@@ -33,14 +38,28 @@ const breadcrumb = computed(() =>
 </script>
 
 <template>
-  <div class="h-full min-h-0 flex flex-col">
-    <PageHeader
-      title="Logs"
-      :breadcrumb="breadcrumb"
-      :back-fallback="podPage ?? '/resources/pods'"
-    />
+  <div class="h-full min-h-0 flex flex-col px-3">
+    <PageHeader title="Logs" :breadcrumb="breadcrumb" :back-fallback="podPage ?? '/resources/pods'">
+      <template #title-trailing>
+        <UBadge
+          v-if="viewer?.paused"
+          color="warning"
+          variant="subtle"
+          size="sm"
+          icon="i-lucide-square-pause"
+          class="ml-1"
+        >
+          Paused
+        </UBadge>
+      </template>
+      <template v-if="source" #actions>
+        <UButton icon="i-lucide-eraser" color="neutral" variant="soft" @click="viewer?.clear()">
+          Clear
+        </UButton>
+      </template>
+    </PageHeader>
 
-    <LogViewer v-if="source" :key="viewerKey" :source="source" class="flex-1" />
+    <LogViewer v-if="source" ref="viewer" :key="viewerKey" :source="source" class="flex-1" />
 
     <div v-else class="flex-1 flex flex-col items-center justify-center gap-1">
       <template v-if="parsed.invalid.length">

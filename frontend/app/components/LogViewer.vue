@@ -3,7 +3,7 @@ import { GetPodContainers } from "#services/logs/service";
 
 import { useVirtualizer } from "@tanstack/vue-virtual";
 
-import type { BufferView } from "~/utils/logBuffer";
+import type { BufferLine, BufferView } from "~/utils/logBuffer";
 import type { PodLogSource } from "~/utils/logSources";
 
 // The multi-stream log viewer (ui-redesign piece 6d2): a bare pod
@@ -17,7 +17,7 @@ const props = defineProps<{
   source: PodLogSource;
 }>();
 
-const { view, streams, maxLineLength, open } = useLogStreams();
+const { view, streams, maxLineLength, open, clear: clearBuffer } = useLogStreams();
 
 // --- Resolution: source -> stream set ---
 
@@ -97,7 +97,14 @@ const gutterCh = computed(() => {
 
 const showTimestamps = ref(true);
 const alignedGutter = ref(false);
+
+// Filter is persistent view state (only matching lines, keeps applying
+// as lines arrive); Find keeps every line, highlights matches, and
+// steps between them. They compose: find searches the filtered view.
 const filter = ref("");
+const filterNeedle = computed(() => filter.value.trim().toLowerCase());
+const findQuery = ref("");
+const findNeedle = computed(() => findQuery.value.trim().toLowerCase());
 
 // Hide is display-only: hidden streams keep buffering, so re-showing
 // has history.
@@ -123,19 +130,145 @@ const displayView = computed(() => frozen.value ?? view.value);
 // flushes, and a same-value computed would stop propagating.
 const visibleView = computed<BufferView>(() => {
   const dv = displayView.value;
-  const needle = filter.value.trim().toLowerCase();
+  const needle = filterNeedle.value;
   const hid = hidden.value;
   if (!needle && !hid.size) return dv;
-  // A filtered view is a search — markers without their surrounding lines are noise.
+  // A filtered view is a search — markers without their surrounding
+  // lines are noise. Verdicts are query-stamped on the lines, so a
+  // flush rescans cached lines at one comparison each; only new lines
+  // pay the string scan.
   return {
     rev: dv.rev,
     lines: dv.lines.filter((line) => {
       if (hid.has(line.stream)) return false;
-      if (needle) return !line.marker && line.text.toLowerCase().includes(needle);
-      return true;
+      if (!needle) return true;
+      if (line.filterQ !== needle) {
+        line.filterQ = needle;
+        line.filterHit = !line.marker && (line.lower ??= line.text.toLowerCase()).includes(needle);
+      }
+      return line.filterHit!;
     }),
   };
 });
+
+// --- Find: counts, positions, stepping ---
+
+// Occurrences per line, query-stamped like the filter verdicts.
+function findHits(line: BufferLine): number {
+  const needle = findNeedle.value;
+  if (!needle || line.marker) return 0;
+  if (line.findQ !== needle) {
+    const lower = (line.lower ??= line.text.toLowerCase());
+    let n = 0;
+    let idx = 0;
+    while ((idx = lower.indexOf(needle, idx)) !== -1) {
+      n++;
+      idx += needle.length;
+    }
+    line.findQ = needle;
+    line.findHits = n;
+  }
+  return line.findHits!;
+}
+
+const findCount = computed(() => {
+  if (!findNeedle.value) return 0;
+  let n = 0;
+  for (const line of visibleView.value.lines) n += findHits(line);
+  return n;
+});
+
+// Stepping targets, built only on frozen views: stepping always
+// freezes first, so the position list is computed once per query on a
+// static document instead of per flush on a live one.
+const matchPositions = computed(() => {
+  const out: { line: number; occ: number }[] = [];
+  if (!findNeedle.value || !frozen.value) return out;
+  visibleView.value.lines.forEach((line, li) => {
+    const n = findHits(line);
+    for (let occ = 0; occ < n; occ++) out.push({ line: li, occ });
+  });
+  return out;
+});
+
+// -1 = no active match yet; the first step lands on the first (or
+// last) match rather than skipping past it.
+const activeMatch = ref(-1);
+watch([findNeedle, matchPositions], () => {
+  activeMatch.value = -1;
+});
+
+// In-field count: total while live, position/total while stepping.
+const findCountLabel = computed(() => {
+  const pos = matchPositions.value;
+  if (pos.length && activeMatch.value >= 0) return `${activeMatch.value + 1}/${pos.length}`;
+  return `${findCount.value}`;
+});
+
+async function stepFind(dir: number) {
+  if (!findNeedle.value) return;
+  if (pinned.value) {
+    // Stepping navigates a stable document: freeze first (the standing
+    // pause semantics), then match against the snapshot.
+    pause();
+    await nextTick();
+  }
+  const pos = matchPositions.value;
+  if (!pos.length) return;
+  activeMatch.value =
+    activeMatch.value < 0
+      ? dir > 0
+        ? 0
+        : pos.length - 1
+      : (activeMatch.value + dir + pos.length) % pos.length;
+  const m = pos[activeMatch.value]!;
+  const el = scrollEl.value;
+  if (el) {
+    el.scrollTop = Math.max(0, 12 + m.line * LINE_HEIGHT - (el.clientHeight - LINE_HEIGHT) / 2);
+  }
+}
+
+function clearFind(e: Event) {
+  findQuery.value = "";
+  (e.target as HTMLInputElement | null)?.blur();
+}
+
+// Cmd-F focuses the ever-present find bar (scoped widget binding, not
+// app-wide chrome).
+const findBar = useTemplateRef("findBar");
+function onKeydown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+    e.preventDefault();
+    findBar.value?.querySelector("input")?.focus();
+  }
+}
+onMounted(() => window.addEventListener("keydown", onKeydown));
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+
+// Splits a line into plain/hit segments for find highlighting — called
+// per rendered row only; the active occurrence gets the strong
+// treatment.
+function lineParts(line: BufferLine, lineIdx: number) {
+  const needle = findNeedle.value;
+  const lower = (line.lower ??= line.text.toLowerCase());
+  const active = activeMatch.value >= 0 ? matchPositions.value[activeMatch.value] : undefined;
+  const parts: { text: string; hit: boolean; active: boolean }[] = [];
+  let pos = 0;
+  let occ = 0;
+  let idx: number;
+  while ((idx = lower.indexOf(needle, pos)) !== -1) {
+    if (idx > pos) parts.push({ text: line.text.slice(pos, idx), hit: false, active: false });
+    parts.push({
+      text: line.text.slice(idx, idx + needle.length),
+      hit: true,
+      active: active?.line === lineIdx && active?.occ === occ,
+    });
+    pos = idx + needle.length;
+    occ++;
+  }
+  if (pos < line.text.length) parts.push({ text: line.text.slice(pos), hit: false, active: false });
+  return parts;
+}
 
 const timeFormat = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
@@ -181,7 +314,7 @@ const virtualRows = computed(() => {
   const rows = visibleView.value.lines;
   const rendered = virtualizer.value.getVirtualItems().flatMap((item) => {
     const line = rows[item.index];
-    return line ? [{ key: item.key, start: item.start, line }] : [];
+    return line ? [{ key: item.key, start: item.start, index: item.index, line }] : [];
   });
   if (!pinned.value || !rows.length) return rendered;
 
@@ -190,7 +323,7 @@ const virtualRows = computed(() => {
   for (let i = Math.max(0, rows.length - tailRows); i < rows.length; i++) {
     const line = rows[i];
     if (line && !covered.has(line.id)) {
-      rendered.push({ key: line.id, start: i * LINE_HEIGHT, line });
+      rendered.push({ key: line.id, start: i * LINE_HEIGHT, index: i, line });
     }
   }
   return rendered;
@@ -253,9 +386,13 @@ function onScroll() {
   if (nowPinned) {
     resume();
   } else if (goingUp) {
-    pinned.value = false;
-    frozen.value = { rev: view.value.rev, lines: view.value.lines.slice() };
+    pause();
   }
+}
+
+function pause() {
+  pinned.value = false;
+  frozen.value = { rev: view.value.rev, lines: view.value.lines.slice() };
 }
 
 function jumpToBottom() {
@@ -271,44 +408,113 @@ async function followTail() {
 watch(view, () => {
   if (pinned.value) followTail();
 });
+
+// --- Header wiring (the page owns PageHeader) ---
+
+const paused = computed(() => frozen.value !== null);
+
+// Clear empties the output and returns to live follow; sessions keep
+// flowing, so new lines arrive from the next flush on.
+function clearOutput() {
+  frozen.value = null;
+  pinned.value = true;
+  clearBuffer();
+}
+
+defineExpose({ paused, clear: clearOutput });
 </script>
 
 <template>
   <div class="h-full min-h-0 flex flex-col">
-    <!-- Toolbar (piece 6d3 reshapes this to the settled design) -->
+    <!-- Toolbar: persistent filter left, view toggles, ever-present
+    find bar right. Paused rides the page title (see defineExpose). -->
     <div class="flex items-center gap-4 mb-4">
-      <USwitch v-model="showTimestamps" label="Timestamps" size="sm" />
-      <USwitch v-model="alignedGutter" label="Aligned Gutter" size="sm" />
-
       <UInput
         v-model="filter"
-        icon="i-lucide-search"
+        icon="i-lucide-list-filter"
         placeholder="Filter lines..."
+        class="w-128"
         autocapitalize="off"
         autocorrect="off"
         spellcheck="false"
-        class="ml-auto max-w-xs w-full"
-        :ui="{ base: 'ring-default', leadingIcon: 'size-4' }"
-      />
-
-      <!-- Scrolled-up = paused view; without the badge a frozen pane
-      reads as a stalled stream. -->
-      <UBadge
-        v-if="frozen"
-        color="neutral"
-        variant="soft"
-        size="sm"
-        icon="i-lucide-pause"
-        class="whitespace-nowrap"
+        :ui="{ base: 'ring-default', leadingIcon: 'size-4', trailing: 'pe-1' }"
       >
-        Paused
-      </UBadge>
-
+        <!-- Slot conditioned, not its content: an empty trailing slot
+        falls back to echoing the input's icon on the right. -->
+        <template v-if="filter" #trailing>
+          <UButton
+            color="neutral"
+            variant="link"
+            size="sm"
+            icon="i-lucide-circle-x"
+            aria-label="Clear filter"
+            @click="filter = ''"
+          />
+        </template>
+      </UInput>
       <!-- Only a filter earns a count: matches are the search result. -->
-      <span v-if="filter.trim()" class="text-xs text-muted whitespace-nowrap">
+      <span v-if="filterNeedle" class="text-xs text-muted whitespace-nowrap">
         {{ visibleView.lines.length }}
         {{ visibleView.lines.length === 1 ? "match" : "matches" }}
       </span>
+
+      <USwitch v-model="showTimestamps" label="Timestamps" size="sm" />
+      <USwitch v-model="alignedGutter" label="Aligned Gutter" size="sm" />
+
+      <!-- Find: ever-present at the right edge. Cmd-F focuses, Esc
+      clears; the count rides inside the field so the input's
+      footprint never changes; stepping freezes the tail. -->
+      <div ref="findBar" class="ml-auto flex items-center gap-1.5">
+        <UInput
+          v-model="findQuery"
+          icon="i-lucide-search"
+          placeholder="Find in logs..."
+          size="sm"
+          class="w-84"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+          :ui="{ base: 'ring-default', leadingIcon: 'size-4', trailing: 'pe-1' }"
+          @keydown.enter.exact.prevent="stepFind(1)"
+          @keydown.shift.enter.prevent="stepFind(-1)"
+          @keydown.esc.prevent="clearFind"
+        >
+          <template v-if="findQuery" #trailing>
+            <span
+              v-if="findNeedle"
+              class="text-xs text-muted tabular-nums whitespace-nowrap pointer-events-none"
+            >
+              {{ findCountLabel }}
+            </span>
+            <UButton
+              color="neutral"
+              variant="link"
+              size="sm"
+              icon="i-lucide-circle-x"
+              aria-label="Clear find"
+              @click="findQuery = ''"
+            />
+          </template>
+        </UInput>
+        <UButton
+          icon="i-lucide-chevron-up"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          aria-label="Previous match"
+          :disabled="!findCount"
+          @click="stepFind(-1)"
+        />
+        <UButton
+          icon="i-lucide-chevron-down"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          aria-label="Next match"
+          :disabled="!findCount"
+          @click="stepFind(1)"
+        />
+      </div>
     </div>
 
     <!-- Whole-viewer banners; per-stream trouble stays on the chips. -->
@@ -455,7 +661,19 @@ watch(view, () => {
                   :style="{ color: streamMeta.get(row.line.stream)?.color }"
                   :title="row.line.stream"
                   >{{ streamMeta.get(row.line.stream)?.prefix }}</span
-                >{{ row.line.text }}
+                ><template v-if="findNeedle"
+                  ><template v-for="(p, pi) in lineParts(row.line, row.index)" :key="pi"
+                    ><span
+                      v-if="p.hit"
+                      :class="
+                        p.active
+                          ? 'bg-warning text-inverted rounded-xs'
+                          : 'bg-warning/25 rounded-xs'
+                      "
+                      >{{ p.text }}</span
+                    ><template v-else>{{ p.text }}</template></template
+                  ></template
+                ><template v-else>{{ row.line.text }}</template>
               </div>
             </template>
           </div>

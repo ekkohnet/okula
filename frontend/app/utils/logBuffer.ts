@@ -25,6 +25,15 @@ export interface BufferLine {
   // they live in the buffer so they keep their position in the flow.
   marker?: "restart";
   exitCode?: number;
+  // Viewer-owned caches: lazily lowered text plus query-stamped
+  // filter/find verdicts. A query change invalidates by string
+  // identity, so per-flush rescans cost one comparison per line and
+  // string work happens once per line per query.
+  lower?: string;
+  filterQ?: string;
+  filterHit?: boolean;
+  findQ?: string;
+  findHits?: number;
 }
 
 // Published view: a fresh wrapper per flush triggers dependents while
