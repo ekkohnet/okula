@@ -16,7 +16,7 @@
 }
 
 :root {
-  --ui-radius: 0.25rem;
+  --ui-radius: 0.15rem;
 
   --ui-header-height: --spacing(16);
 }

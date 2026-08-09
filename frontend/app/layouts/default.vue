@@ -221,6 +221,11 @@ const designNavItems = [
     icon: "i-lucide-pencil-ruler",
     to: "/design/pod",
   },
+  {
+    label: "Log Viewer",
+    icon: "i-lucide-scroll-text",
+    to: "/design/logs",
+  },
 ] satisfies NavigationMenuItem[];
 
 // Cluster-scoped links disable without an active cluster; collapsible group

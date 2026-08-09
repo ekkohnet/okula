@@ -65,6 +65,9 @@ async function copyName() {
             @click="copyName"
           />
         </UTooltip>
+        <!-- Page-level state riding the title (e.g. the log viewer's
+        Paused badge): prominent without interrupting other chrome. -->
+        <slot name="title-trailing" />
       </div>
       <p v-if="breadcrumb?.length" class="text-sm text-muted">
         <template v-for="(item, i) in breadcrumb" :key="i">
