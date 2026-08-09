@@ -4,7 +4,7 @@ import type { PodContainers } from "#services/logs/models";
 
 import { useVirtualizer } from "@tanstack/vue-virtual";
 
-import type { LogLine } from "~/composables/useLogStream";
+import type { BufferView } from "~/utils/logBuffer";
 import type { PodLogSource } from "~/utils/logSources";
 
 const props = defineProps<{
@@ -15,17 +15,18 @@ const props = defineProps<{
 // the URL, so it goes up as an event.
 const emit = defineEmits<{ narrow: [container: string] }>();
 
-const {
-  lines,
-  maxLineLength,
-  running,
-  ended,
-  endedError,
-  startError,
-  status,
-  statusReason,
-  start,
-} = useLogStream();
+const { view, streams, maxLineLength, open } = useLogStreams();
+
+// Single-stream parity (piece 6d1): the manager runs one stream, so
+// the toolbar badges and banners read the first record. Chips replace
+// this in 6d2.
+const primary = computed(() => streams.value[0]);
+const running = computed(() => primary.value?.running ?? false);
+const ended = computed(() => primary.value?.ended ?? false);
+const endedError = computed(() => primary.value?.endedError ?? null);
+const startError = computed(() => primary.value?.startError ?? null);
+const status = computed(() => primary.value?.status ?? "live");
+const statusReason = computed(() => primary.value?.statusReason ?? null);
 
 const containers = ref<PodContainers | null>(null);
 const selectedContainer = ref("");
@@ -48,17 +49,23 @@ const containerItems = computed(() => {
 // chunks land in the buffer behind it. A bounded ring can't keep both
 // the reading position stable and the view live — at flood rates
 // eviction shifts every index hundreds of lines per flush — so
-// scrolled-up means paused, and reaching the bottom resumes.
-const frozen = shallowRef<LogLine[] | null>(null);
-const displayLines = computed(() => frozen.value ?? lines.value);
+// scrolled-up means paused, and reaching the bottom resumes. The
+// snapshot is a real copy: the live array mutates in place.
+const frozen = shallowRef<BufferView | null>(null);
+const displayView = computed(() => frozen.value ?? view.value);
 
-const visibleLines = computed(() => {
+// Consumers track BufferView wrappers, never the array through a
+// pass-through computed — the live array keeps its identity across
+// flushes, and a same-value computed would stop propagating.
+const visibleView = computed<BufferView>(() => {
+  const dv = displayView.value;
   const needle = filter.value.trim().toLowerCase();
-  if (!needle) return displayLines.value;
+  if (!needle) return dv;
   // A filtered view is a search — markers without their surrounding lines are noise.
-  return displayLines.value.filter(
-    (line) => !line.marker && line.text.toLowerCase().includes(needle),
-  );
+  return {
+    rev: dv.rev,
+    lines: dv.lines.filter((line) => !line.marker && line.text.toLowerCase().includes(needle)),
+  };
 });
 
 const timeFormat = new Intl.DateTimeFormat(undefined, {
@@ -78,12 +85,14 @@ function restart() {
   // A fresh stream follows from the start, whatever the old view did.
   pinned.value = true;
   frozen.value = null;
-  start({
-    namespace: props.source.namespace,
-    pod: props.source.pod,
-    container: selectedContainer.value,
-    previous: previous.value,
-  });
+  open([
+    {
+      namespace: props.source.namespace,
+      pod: props.source.pod,
+      container: selectedContainer.value,
+      previous: previous.value,
+    },
+  ]);
 }
 
 onMounted(async () => {
@@ -130,13 +139,13 @@ const scrollEl = useTemplateRef("scrollEl");
 
 const virtualizer = useVirtualizer(
   computed(() => ({
-    count: visibleLines.value.length,
+    count: visibleView.value.lines.length,
     getScrollElement: () => scrollEl.value,
     estimateSize: () => LINE_HEIGHT,
     overscan: 20,
     // Fallback for a stale-range tick must not collide with real
     // (positive) line ids — duplicate v-for keys corrupt the patch.
-    getItemKey: (index: number) => visibleLines.value[index]?.id ?? -(index + 1),
+    getItemKey: (index: number) => visibleView.value.lines[index]?.id ?? -(index + 1),
   })),
 );
 
@@ -147,7 +156,7 @@ const virtualizer = useVirtualizer(
 // the render regardless of the virtualizer's one-frame-stale range;
 // the union converges once its scroll handler catches up.
 const virtualRows = computed(() => {
-  const rows = visibleLines.value;
+  const rows = visibleView.value.lines;
   const rendered = virtualizer.value.getVirtualItems().flatMap((item) => {
     const line = rows[item.index];
     return line ? [{ key: item.key, start: item.start, line }] : [];
@@ -221,7 +230,7 @@ function onScroll() {
     resume();
   } else if (goingUp) {
     pinned.value = false;
-    frozen.value = lines.value;
+    frozen.value = { rev: view.value.rev, lines: view.value.lines.slice() };
   }
 }
 
@@ -235,7 +244,7 @@ async function followTail() {
   if (el) el.scrollTop = el.scrollHeight;
 }
 
-watch(lines, () => {
+watch(view, () => {
   if (pinned.value) followTail();
 });
 </script>
@@ -302,7 +311,8 @@ watch(lines, () => {
 
       <!-- Only a filter earns a count: matches are the search result. -->
       <span v-if="filter.trim()" class="text-xs text-muted whitespace-nowrap">
-        {{ visibleLines.length }} {{ visibleLines.length === 1 ? "match" : "matches" }}
+        {{ visibleView.lines.length }}
+        {{ visibleView.lines.length === 1 ? "match" : "matches" }}
       </span>
     </div>
 
@@ -338,14 +348,14 @@ watch(lines, () => {
         @scroll.passive="onScroll"
       >
         <div
-          v-if="!displayLines.length"
+          v-if="!displayView.lines.length"
           class="h-full flex items-center justify-center text-dimmed"
         >
           {{ running ? "Waiting for logs..." : "No log output." }}
         </div>
 
         <div
-          v-else-if="!visibleLines.length"
+          v-else-if="!visibleView.lines.length"
           class="h-full flex items-center justify-center text-dimmed"
         >
           No lines match the filter.
