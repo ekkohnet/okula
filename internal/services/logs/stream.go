@@ -19,10 +19,16 @@ import (
 )
 
 const (
-	// flushInterval/flushMaxLines batch stream lines into chunk events:
-	// frequent enough to feel live, batched enough to survive chatty pods.
+	// flushInterval paces chunk events and is the only flush trigger, so
+	// event frequency stays bounded however fast a pod logs. Each emit
+	// crosses the app's main thread; an unpaced emitter backs that hop up
+	// at flood rates until the whole stream pipeline stalls behind it.
 	flushInterval = 75 * time.Millisecond
-	flushMaxLines = 500
+
+	// flushRingCap bounds a chunk to what the viewer's ring buffer keeps
+	// (frontend MAX_LOG_LINES — move them together): lines beyond it
+	// would be evicted on arrival, so shipping them is pure IPC waste.
+	flushRingCap = 20000
 
 	// maxLineBytes bounds a single log line; JSON log lines can be huge and
 	// bufio.Scanner's 64KB default would kill the stream.
@@ -245,14 +251,19 @@ func (svc *Service) pumpStream(ctx context.Context, stream io.Reader, sess *sess
 		readErr = scanner.Err()
 	}()
 
-	// Batcher: lines -> LogChunk events.
-	batch := make([]LogLine, 0, flushMaxLines)
+	// Batcher: lines -> LogChunk events, emitted on the ticker only. The
+	// emitted slice is never reused (fresh backing each flush) in case
+	// the emit marshals asynchronously.
+	batch := make([]LogLine, 0, 256)
 	flush := func() {
 		if len(batch) == 0 {
 			return
 		}
+		if len(batch) > flushRingCap {
+			batch = batch[len(batch)-flushRingCap:]
+		}
 		application.Get().Event.Emit("LogChunk:"+sess.id, LogChunk{Lines: batch})
-		batch = make([]LogLine, 0, flushMaxLines)
+		batch = make([]LogLine, 0, 256)
 	}
 
 	ticker := time.NewTicker(flushInterval)
@@ -273,8 +284,9 @@ func (svc *Service) pumpStream(ctx context.Context, stream io.Reader, sess *sess
 				st.lastT = line.T
 			}
 			batch = append(batch, line)
-			if len(batch) >= flushMaxLines {
-				flush()
+			// Ring-trim between flushes; 2x hysteresis amortizes the copy.
+			if len(batch) >= 2*flushRingCap {
+				batch = append(batch[:0], batch[len(batch)-flushRingCap:]...)
 			}
 		case <-ticker.C:
 			flush()
