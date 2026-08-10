@@ -58,7 +58,7 @@ const resourceNavItems = [
     children: [
       {
         label: "Pods",
-        icon: "i-lucide-container",
+        icon: "i-lucide-box",
         to: "/resources/pods",
       },
       {
@@ -220,6 +220,11 @@ const designNavItems = [
     label: "Pod Page",
     icon: "i-lucide-pencil-ruler",
     to: "/design/pod",
+  },
+  {
+    label: "Log Viewer",
+    icon: "i-lucide-scroll-text",
+    to: "/design/logs",
   },
 ] satisfies NavigationMenuItem[];
 

@@ -6,6 +6,9 @@
 interface BreadcrumbItem {
   label: string;
   to?: string;
+  // Separator rendered before this item; defaults to "/". Lets a line
+  // mix separators (the log viewer's "N sources • context / name").
+  separator?: string;
 }
 
 const props = defineProps<{
@@ -71,7 +74,7 @@ async function copyName() {
       </div>
       <p v-if="breadcrumb?.length" class="text-sm text-muted">
         <template v-for="(item, i) in breadcrumb" :key="i">
-          <span v-if="i" class="text-dimmed mx-2">/</span>
+          <span v-if="i" class="text-dimmed mx-2">{{ item.separator ?? "/" }}</span>
           <ULink v-if="item.to" raw :to="item.to" class="hover:text-highlighted transition-colors">
             {{ item.label }}
           </ULink>
