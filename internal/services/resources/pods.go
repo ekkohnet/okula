@@ -33,6 +33,13 @@ func projectPodRow(u *unstructured.Unstructured) (map[string]any, error) {
 	}
 
 	status := podStatus(&pod)
+	severity := podStatusSeverity(status)
+	// Running with the Ready condition false (startup or readiness
+	// probe not yet passing) is not a healthy green: keep the kubectl
+	// label, warn accent.
+	if status == "Running" && !hasPodReadyCondition(pod.Status.Conditions) {
+		severity = "warn"
+	}
 
 	return map[string]any{
 		"uid":            string(pod.UID),
@@ -41,7 +48,7 @@ func projectPodRow(u *unstructured.Unstructured) (map[string]any, error) {
 		"ready":          fmt.Sprintf("%d/%d", readyCount, len(pod.Spec.Containers)),
 		"restarts":       restarts,
 		"status":         status,
-		"statusSeverity": podStatusSeverity(status),
+		"statusSeverity": severity,
 		"qos":            string(pod.Status.QOSClass),
 		"ip":             pod.Status.PodIP,
 		"node":           pod.Spec.NodeName,
