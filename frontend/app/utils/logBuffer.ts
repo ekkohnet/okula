@@ -38,6 +38,9 @@ export interface BufferLine {
   // identity, so per-flush rescans cost one comparison per line and
   // string work happens once per line per query.
   lower?: string;
+  // Render clip of a pathological-length line (see the viewer's
+  // MAX_RENDER_CH) — the buffer always keeps the full text.
+  clipped?: string;
   filterQ?: string;
   filterHit?: boolean;
   findQ?: string;
@@ -109,6 +112,33 @@ export class LogBuffer {
     this.lines.length = 0;
     this.counts.clear();
     this.gaps.clear();
+  }
+
+  // The stream's retention floor: the timestamp of its earliest
+  // retained line. Previous-instance backfills insert only below it
+  // (cutoff insertion) — duplicate-free whatever the session
+  // witnessed. Null when nothing (timestamped) is retained.
+  earliestT(stream: string): number | null {
+    for (const line of this.lines) {
+      if (line.stream === stream && !line.marker && line.t) return line.t;
+    }
+    return null;
+  }
+
+  // Drops every line of a removed source's streams, markers included —
+  // the URL is the truth of what the viewer contains (piece 6e).
+  removeStream(stream: string) {
+    const lines = this.lines;
+    let w = 0;
+    for (let r = 0; r < lines.length; r++) {
+      const line = lines[r]!;
+      if (line.stream === stream) continue;
+      if (w !== r) lines[w] = line;
+      w++;
+    }
+    lines.length = w;
+    this.counts.delete(stream);
+    this.gaps.delete(stream);
   }
 
   // Folds transport-cap drops (LogChunk.dropped) into the stream's gap

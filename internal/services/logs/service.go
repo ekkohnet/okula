@@ -10,6 +10,7 @@ import (
 	"github.com/ekkohnet/okula/internal/services/cluster"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -83,12 +84,16 @@ func (svc *Service) handleConnectionChanged(handle *cluster.ConnectionHandle) {
 
 // LogStreamOptions selects what to stream. TailLines <= 0 uses the default;
 // Previous streams the prior (crashed) container's logs and does not follow.
+// SessionID lets the caller name the session so it can register event
+// handlers BEFORE the call — a finite previous fetch can replay and end
+// entirely inside the registration gap otherwise (the piece-5 pattern).
 type LogStreamOptions struct {
 	Namespace string `json:"namespace"`
 	Pod       string `json:"pod"`
 	Container string `json:"container"`
 	TailLines int64  `json:"tailLines"`
 	Previous  bool   `json:"previous"`
+	SessionID string `json:"sessionId,omitempty"`
 }
 
 // StartLogStream begins a streaming session and returns its id. Lines arrive
@@ -105,7 +110,12 @@ func (svc *Service) StartLogStream(ctx context.Context, opts LogStreamOptions) (
 	}
 
 	svc.sessionSeq++
-	id := fmt.Sprintf("log-%d", svc.sessionSeq)
+	id := opts.SessionID
+	if id == "" {
+		id = fmt.Sprintf("log-%d", svc.sessionSeq)
+	} else if svc.sessions[id] != nil {
+		return "", fmt.Errorf("session id %q already in use", id)
+	}
 
 	sessCtx, cancel := context.WithCancel(svc.connCtx)
 	sess := &session{
@@ -164,12 +174,25 @@ func (svc *Service) GetPodContainers(ctx context.Context, namespace string, pod 
 	result := PodContainers{
 		Containers:     make([]string, 0, len(p.Spec.Containers)),
 		InitContainers: make([]string, 0, len(p.Spec.InitContainers)),
+		RestartCounts:  make(map[string]int32),
+		LastExitCodes:  make(map[string]int32),
 	}
 	for _, c := range p.Spec.Containers {
 		result.Containers = append(result.Containers, c.Name)
 	}
 	for _, c := range p.Spec.InitContainers {
 		result.InitContainers = append(result.InitContainers, c.Name)
+	}
+	for _, statuses := range [][]corev1.ContainerStatus{
+		p.Status.ContainerStatuses,
+		p.Status.InitContainerStatuses,
+	} {
+		for _, cs := range statuses {
+			result.RestartCounts[cs.Name] = cs.RestartCount
+			if t := cs.LastTerminationState.Terminated; t != nil {
+				result.LastExitCodes[cs.Name] = t.ExitCode
+			}
+		}
 	}
 	return result, nil
 }

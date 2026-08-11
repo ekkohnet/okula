@@ -8,9 +8,8 @@ export interface PodLogSource {
   kind: "pod";
   namespace: string;
   pod: string;
-  // Absent means every container of the pod. Until the merge engine
-  // lands, the viewer narrows a bare source to one container and
-  // rewrites the URL, so the bare form never persists as an address.
+  // Absent means every container of the pod (init included); present
+  // narrows the source to one container.
   container?: string;
 }
 
@@ -34,6 +33,28 @@ export function parseLogSource(raw: string): LogSource | null {
   if (!namespace || !pod || container === "") return null;
 
   return { kind: "pod", namespace, pod, container };
+}
+
+// Reduces a source list to the minimal non-overlapping set: a bare pod
+// subsumes its narrowed sources, duplicates collapse — so a stale
+// spawn address plus an add can never duplicate streams.
+// Order-preserving: survivors keep their positions (order assigns
+// color slots on a fresh mount).
+export function normalizeLogSources(sources: LogSource[]): LogSource[] {
+  const bare = new Set<string>();
+  for (const s of sources) {
+    if (!s.container) bare.add(`${s.namespace}/${s.pod}`);
+  }
+  const seen = new Set<string>();
+  const out: LogSource[] = [];
+  for (const s of sources) {
+    if (s.container && bare.has(`${s.namespace}/${s.pod}`)) continue;
+    const key = formatLogSource(s);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
 }
 
 // Reads every `src` query param, keeping the invalid ones for the page

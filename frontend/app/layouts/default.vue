@@ -221,18 +221,24 @@ const designNavItems = [
     icon: "i-lucide-pencil-ruler",
     to: "/design/pod",
   },
-  {
-    label: "Log Viewer",
-    icon: "i-lucide-scroll-text",
-    to: "/design/logs",
-  },
 ] satisfies NavigationMenuItem[];
+
+const { lastUrl: lastLogUrl } = useLogSessions();
 
 // Cluster-scoped links disable without an active cluster; collapsible group
 // headings stay usable so the nav can still be explored.
-const navLinks = computed<NavigationMenuItem[]>(() =>
-  clusterNavItems.map((item) => ({ ...item, disabled: !activeCluster.value })),
-);
+const navLinks = computed<NavigationMenuItem[]>(() => {
+  const items = clusterNavItems.map((item) => ({ ...item, disabled: !activeCluster.value }));
+  // The Log Viewer entry reopens the last session — the URL is the
+  // session, so the remembered address is the whole mechanism.
+  items.splice(2, 0, {
+    label: "Log Viewer",
+    icon: "i-lucide-scroll-text",
+    to: lastLogUrl.value ?? "/logs",
+    disabled: !activeCluster.value,
+  });
+  return items;
+});
 
 const resourceLinks = computed<NavigationMenuItem[]>(() =>
   resourceNavItems.map((group) => ({

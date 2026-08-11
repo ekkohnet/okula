@@ -3,81 +3,282 @@ import { GetPodContainers } from "#services/logs/service";
 
 import { useVirtualizer } from "@tanstack/vue-virtual";
 
+import type { DropdownMenuItem } from "@nuxt/ui";
+
+import type { StreamInfo, StreamSpec } from "~/composables/useLogStreams";
 import type { BufferLine, BufferView } from "~/utils/logBuffer";
 import type { PodLogSource } from "~/utils/logSources";
 
-// The multi-stream log viewer (ui-redesign piece 6d2): a bare pod
-// source fans out to every container, one backend session per stream,
-// merged by timestamp into one pane. Chips carry per-stream status and
-// visibility; colored prefixes carry line identity. The page keys this
-// component by the full source string — a source change is a fresh
-// mount.
+// The multi-source log viewer (ui-redesign piece 6e): each source is a
+// selector resolving to a set of streams — a bare pod fans out to
+// every container, a narrowed source to one — one backend session per
+// stream, merged by timestamp into one pane. The band groups chips per
+// source; colored prefixes carry line identity. The page passes the
+// normalized source list; source-set changes reconcile in place
+// (open/close only the delta — unchanged streams keep their buffers).
 
 const props = defineProps<{
-  source: PodLogSource;
+  sources: PodLogSource[];
+  // Unparseable src params, reported in the empty pane — addresses
+  // can be stale or mistyped, never silently eaten.
+  invalid?: string[];
 }>();
 
-const { view, streams, maxLineLength, open, clear: clearBuffer } = useLogStreams();
+// Composition edits go through the page — it owns the URL, and the URL
+// is the truth of the viewer's contents. `add` opens the palette.
+const emit = defineEmits<{ removeSource: [key: string]; add: [] }>();
 
-// --- Resolution: source -> stream set ---
+const {
+  view,
+  streams,
+  maxLineLength,
+  open,
+  stop,
+  clear: clearBuffer,
+  loadPrevious,
+} = useLogStreams();
+
+// --- Resolution: sources -> stream set ---
 
 const resolving = ref(false);
-const resolveError = ref<string | null>(null);
+// Per-source resolution results and failures, keyed by source string.
+const resolved = shallowRef(new Map<string, StreamSpec[]>());
+const resolveErrors = shallowRef(new Map<string, string>());
 
-async function openSource() {
-  pinned.value = true;
-  frozen.value = null;
-  const { namespace, pod, container } = props.source;
-  if (container) {
-    open([{ namespace, pod, container }]);
-    return;
-  }
-  resolving.value = true;
-  resolveError.value = null;
+// Sticky color slots: a source takes the lowest free slot on add and
+// keeps it for the viewer's life; freed slots recycle. A fresh mount
+// recomputes from URL order.
+const slotMap = shallowRef(new Map<string, number>());
+
+// Per-pod container info (restart counts + last exit codes), keyed
+// ns/pod — the Load Previous enable rule and the un-witnessed boundary
+// divider's exit code. Fetched once per pod whatever the source
+// granularity; bare-source resolution feeds it for free.
+interface PodInfo {
+  restartCounts: Record<string, number>;
+  lastExitCodes: Record<string, number>;
+}
+const podInfo = shallowRef(new Map<string, PodInfo>());
+
+function setPodInfo(key: string, pc: { restartCounts?: unknown; lastExitCodes?: unknown }) {
+  const next = new Map(podInfo.value);
+  next.set(key, {
+    restartCounts: (pc.restartCounts ?? {}) as Record<string, number>,
+    lastExitCodes: (pc.lastExitCodes ?? {}) as Record<string, number>,
+  });
+  podInfo.value = next;
+}
+
+async function fetchPodInfo(namespace: string, pod: string) {
+  const key = `${namespace}/${pod}`;
+  if (podInfo.value.has(key)) return;
   try {
-    const pc = await GetPodContainers(namespace, pod);
-    // Main containers first, then init (native sidecars ride the init
-    // list) — the order assigns palette slots and chip positions.
-    const names = [...(pc.containers ?? []), ...(pc.initContainers ?? [])];
-    if (!names.length) throw new Error(`pod ${namespace}/${pod} has no containers`);
-    open(names.map((container) => ({ namespace, pod, container })));
-  } catch (err) {
-    resolveError.value = toErrorString(err);
-  } finally {
-    resolving.value = false;
+    setPodInfo(key, await GetPodContainers(namespace, pod));
+  } catch {
+    // Without the data the menu item just stays disabled; the source's
+    // own resolution path surfaces real errors.
   }
 }
 
-onMounted(openSource);
+const sourceKeys = computed(() => props.sources.map((s) => formatLogSource(s)));
+
+function nextFreeSlot(slots: Map<string, number>): number {
+  const used = new Set(slots.values());
+  let n = 0;
+  while (used.has(n)) n++;
+  return n;
+}
+
+async function reconcile() {
+  const desired = new Set(sourceKeys.value);
+
+  const slots = new Map(slotMap.value);
+  for (const k of [...slots.keys()]) if (!desired.has(k)) slots.delete(k);
+  for (const k of sourceKeys.value) if (!slots.has(k)) slots.set(k, nextFreeSlot(slots));
+  slotMap.value = slots;
+
+  const res = new Map(resolved.value);
+  const errs = new Map(resolveErrors.value);
+  for (const k of [...res.keys()]) if (!desired.has(k)) res.delete(k);
+  for (const k of [...errs.keys()]) if (!desired.has(k)) errs.delete(k);
+
+  // Pod info follows the source set: prune pods with no sources left,
+  // fetch for narrowed sources (bare resolution feeds it for free).
+  const podsDesired = new Set(props.sources.map((s) => `${s.namespace}/${s.pod}`));
+  if ([...podInfo.value.keys()].some((k) => !podsDesired.has(k))) {
+    podInfo.value = new Map([...podInfo.value].filter(([k]) => podsDesired.has(k)));
+  }
+
+  // Narrowed sources resolve trivially; bare pods need the container
+  // fan-out (main first, then init — native sidecars ride the init
+  // list; the order sets chip positions).
+  const toResolve: PodLogSource[] = [];
+  for (const src of props.sources) {
+    const k = formatLogSource(src);
+    if (src.container) fetchPodInfo(src.namespace, src.pod);
+    if (res.has(k)) continue;
+    if (src.container) {
+      res.set(k, [{ namespace: src.namespace, pod: src.pod, container: src.container }]);
+    } else if (!errs.has(k)) {
+      toResolve.push(src);
+    }
+  }
+  resolved.value = res;
+  resolveErrors.value = errs;
+  apply();
+
+  if (!toResolve.length) return;
+  resolving.value = true;
+  try {
+    await Promise.all(
+      toResolve.map(async (src) => {
+        const k = formatLogSource(src);
+        try {
+          const pc = await GetPodContainers(src.namespace, src.pod);
+          setPodInfo(`${src.namespace}/${src.pod}`, pc);
+          const names = [...(pc.containers ?? []), ...(pc.initContainers ?? [])];
+          if (!names.length) throw new Error(`pod ${src.namespace}/${src.pod} has no containers`);
+          if (!sourceKeys.value.includes(k)) return; // removed while resolving
+          const next = new Map(resolved.value);
+          next.set(
+            k,
+            names.map((container) => ({ namespace: src.namespace, pod: src.pod, container })),
+          );
+          resolved.value = next;
+        } catch (err) {
+          if (!sourceKeys.value.includes(k)) return;
+          const next = new Map(resolveErrors.value);
+          next.set(k, toErrorString(err));
+          resolveErrors.value = next;
+        }
+      }),
+    );
+  } finally {
+    resolving.value = false;
+    apply();
+  }
+}
+
+// The manager reconciles to the full desired set: removed sources drop
+// their lines, survivors keep theirs.
+function apply() {
+  open(props.sources.flatMap((s) => resolved.value.get(formatLogSource(s)) ?? []));
+}
+
+watch(() => sourceKeys.value.join("&"), reconcile, { immediate: true });
+
+// Resume/Retry is an explicit restart: fresh sessions re-tail
+// everything, so the buffer clears rather than duplicating tails.
+function restartAll() {
+  pinned.value = true;
+  frozen.value = null;
+  stop();
+  clearBuffer();
+  resolved.value = new Map();
+  resolveErrors.value = new Map();
+  // Fresh sessions: loaded-previous state is stale, and restart counts
+  // may have moved — refetch both.
+  prevState.value = new Map();
+  podInfo.value = new Map();
+  reconcile();
+}
 
 // --- Aggregate stream state ---
 
 const anyRunning = computed(() => streams.value.some((s) => s.running));
 const allEnded = computed(() => streams.value.length > 0 && streams.value.every((s) => s.ended));
+// Whole-viewer failure: every stream failed to start, or nothing
+// resolved at all and at least one source errored.
 const allFailed = computed(
-  () => streams.value.length > 0 && streams.value.every((s) => s.startError),
+  () =>
+    (streams.value.length > 0 && streams.value.every((s) => s.startError)) ||
+    (streams.value.length === 0 && resolveErrors.value.size > 0 && !resolving.value),
 );
 const endedError = computed(() => streams.value.find((s) => s.endedError)?.endedError ?? null);
 const startError = computed(
-  () => resolveError.value ?? streams.value.find((s) => s.startError)?.startError ?? null,
+  () =>
+    streams.value.find((s) => s.startError)?.startError ??
+    [...resolveErrors.value.values()][0] ??
+    null,
 );
 
-// --- Stream identity: prefixes and colors ---
+// --- Source groups and stream identity ---
 
-// Shortest-unambiguous prefixes: container only while every stream
-// shares one pod, pod/container once pods differ. A single source is
-// always one pod today; the rule is ready for multi-source.
-const multiPod = computed(() => new Set(streams.value.map((s) => s.pod)).size > 1);
+interface SourceGroup {
+  key: string;
+  namespace: string;
+  pod: string;
+  container?: string;
+  color: string;
+  streams: StreamInfo[];
+  anyVisible: boolean;
+  error?: string;
+}
 
+const streamsByKey = computed(() => new Map(streams.value.map((s) => [s.key, s])));
+
+// Band groups, one per source in URL order — group = source, chips =
+// streams, at every N (the settled band grammar).
+const groups = computed<SourceGroup[]>(() =>
+  props.sources.map((src) => {
+    const k = formatLogSource(src);
+    const members = (resolved.value.get(k) ?? [])
+      .map((sp) => streamsByKey.value.get(`${sp.namespace}/${sp.pod}/${sp.container}`))
+      .filter((s): s is StreamInfo => !!s);
+    return {
+      key: k,
+      namespace: src.namespace,
+      pod: src.pod,
+      container: src.container,
+      color: SERIES_COLORS[(slotMap.value.get(k) ?? 0) % SERIES_COLORS.length]!,
+      streams: members,
+      anyVisible: members.some((s) => !hidden.value.has(s.key)),
+      error: resolveErrors.value.get(k),
+    };
+  }),
+);
+
+const multiPod = computed(
+  () => new Set(props.sources.map((s) => `${s.namespace}/${s.pod}`)).size > 1,
+);
+const mixedNs = computed(() => new Set(props.sources.map((s) => s.namespace)).size > 1);
+
+// Pod names appearing under more than one namespace — the collision
+// that forces the ns prefix tier.
+const dupNames = computed(() => {
+  const seen = new Map<string, string>();
+  const dups = new Set<string>();
+  for (const s of props.sources) {
+    const ns = seen.get(s.pod);
+    if (ns !== undefined && ns !== s.namespace) dups.add(s.pod);
+    else seen.set(s.pod, s.namespace);
+  }
+  return dups;
+});
+
+// Color axis follows the prefix rule: per container while one pod is
+// all the identity there is, per source once sources multiply.
+const perSourceColors = computed(() => props.sources.length > 1);
+
+// Shortest-unambiguous prefixes, three tiers: container only while one
+// pod; pod/container once pods differ; ns/pod/container only for pods
+// whose name collides across namespaces.
 const streamMeta = computed(() => {
   const meta = new Map<string, { prefix: string; container: string; color: string }>();
-  streams.value.forEach((s, i) => {
-    meta.set(s.key, {
-      prefix: multiPod.value ? `${s.pod}/${s.container}` : s.container,
-      container: s.container,
-      color: SERIES_COLORS[i % SERIES_COLORS.length]!,
+  for (const g of groups.value) {
+    g.streams.forEach((s, i) => {
+      const prefix = !multiPod.value
+        ? s.container
+        : dupNames.value.has(s.pod)
+          ? `${s.namespace}/${s.pod}/${s.container}`
+          : `${s.pod}/${s.container}`;
+      meta.set(s.key, {
+        prefix,
+        container: s.container,
+        color: perSourceColors.value ? g.color : SERIES_COLORS[i % SERIES_COLORS.length]!,
+      });
     });
-  });
+  }
   return meta;
 });
 
@@ -116,6 +317,164 @@ function toggleStream(key: string) {
   hidden.value = next;
 }
 
+// Tri-state per-pod toggle on the segment: any visible -> hide all;
+// all hidden -> show all.
+function togglePod(g: SourceGroup) {
+  const next = new Set(hidden.value);
+  if (g.anyVisible) g.streams.forEach((s) => next.add(s.key));
+  else g.streams.forEach((s) => next.delete(s.key));
+  hidden.value = next;
+}
+
+function solo(keys: string[]) {
+  const keep = new Set(keys);
+  hidden.value = new Set(streams.value.filter((s) => !keep.has(s.key)).map((s) => s.key));
+}
+
+// Exactly these keys visible and every other stream hidden — the state
+// solo() produces. Stateless: hand-toggling a chip breaks the state
+// and the menu reverts to Solo. The hidden.size guard keeps a
+// whole-composition solo (a no-op) from reading as soloed at rest.
+function isSoloed(keys: string[]): boolean {
+  if (!hidden.value.size) return false;
+  const keep = new Set(keys);
+  return streams.value.every((s) => keep.has(s.key) !== hidden.value.has(s.key));
+}
+
+function unsolo() {
+  hidden.value = new Set();
+}
+
+// Worst status across a group — statuses live on chips, so when a
+// fully hidden group's chips give way to the show-all cell, trouble
+// stays visible where they were.
+function worstStatusIcon(members: StreamInfo[]): { name: string; cls: string } | null {
+  if (members.some((s) => s.startError))
+    return { name: "i-lucide-triangle-alert", cls: "text-error" };
+  if (members.some((s) => s.ended && s.endedError))
+    return { name: "i-lucide-circle-alert", cls: "text-error" };
+  if (members.some((s) => s.status === "waiting"))
+    return { name: "i-lucide-clock", cls: "text-warning" };
+  if (members.some((s) => s.status === "reconnecting"))
+    return { name: "i-lucide-loader-2", cls: "animate-spin text-muted" };
+  if (members.length > 0 && members.every((s) => s.ended))
+    return { name: "i-lucide-circle-slash", cls: "text-dimmed" };
+  return null;
+}
+
+// --- Source menu (the three-dot is the only menu surface) ---
+
+function soloItem(keys: string[]): DropdownMenuItem {
+  return isSoloed(keys)
+    ? { label: "Unsolo", icon: "i-lucide-target", onSelect: unsolo }
+    : { label: "Solo", icon: "i-lucide-target", onSelect: () => solo(keys) };
+}
+
+// Load Previous menu state per stream: one-shot — loaded is terminal;
+// a failure re-enables with a retry label.
+const prevState = shallowRef(new Map<string, "loading" | "loaded" | { error: string }>());
+
+function setPrevState(key: string, v: "loading" | "loaded" | { error: string }) {
+  const next = new Map(prevState.value);
+  next.set(key, v);
+  prevState.value = next;
+}
+
+function previousItem(s: StreamInfo): DropdownMenuItem {
+  const state = prevState.value.get(s.key);
+  if (state === "loading")
+    return { label: "Loading Previous...", icon: "i-lucide-history", disabled: true };
+  if (state === "loaded")
+    return { label: "Previous Loaded", icon: "i-lucide-history", disabled: true };
+  // Enabled only when a terminated prior instance exists.
+  const restarts = podInfo.value.get(`${s.namespace}/${s.pod}`)?.restartCounts[s.container] ?? 0;
+  return {
+    label: state ? "Previous Failed — Retry" : "Load Previous Logs",
+    icon: "i-lucide-history",
+    disabled: !restarts,
+    onSelect: () => loadPreviousFor(s),
+  };
+}
+
+async function loadPreviousFor(s: StreamInfo) {
+  setPrevState(s.key, "loading");
+  try {
+    const exit = podInfo.value.get(`${s.namespace}/${s.pod}`)?.lastExitCodes[s.container];
+    const inserted = await loadPrevious(s.key, exit);
+    // While paused the pane renders a snapshot, so a backfill landing
+    // in the live buffer would stay invisible until resume — retake
+    // the snapshot in place instead.
+    if (inserted && frozen.value) await refreezeInPlace();
+    setPrevState(s.key, "loaded");
+  } catch (err) {
+    console.warn(`load previous failed for ${s.key}:`, err);
+    setPrevState(s.key, { error: toErrorString(err) });
+  }
+}
+
+// Retakes the paused snapshot from the live buffer, then compensates
+// the scroll offset by how far the viewport's top line moved (id
+// anchor — insertions and evictions above the fold shift the offset,
+// never the reading position). 12 = the pane's p-3, as in stepFind.
+async function refreezeInPlace() {
+  const el = scrollEl.value;
+  const before = visibleView.value.lines;
+  const anchorIdx = Math.min(
+    Math.max(0, Math.floor(((el?.scrollTop ?? 0) - 12) / LINE_HEIGHT)),
+    before.length - 1,
+  );
+  const anchor = before[anchorIdx];
+  pause();
+  if (!el || !anchor) return;
+  await nextTick();
+  const newIdx = visibleView.value.lines.findIndex((l) => l.id === anchor.id);
+  if (newIdx >= 0 && newIdx !== anchorIdx) el.scrollTop += (newIdx - anchorIdx) * LINE_HEIGHT;
+}
+
+// Per-stream actions live as per-container submenus of the source
+// menu.
+function streamChildren(s: StreamInfo): DropdownMenuItem[] {
+  const isHidden = hidden.value.has(s.key);
+  return [
+    {
+      label: isHidden ? "Show" : "Hide",
+      icon: isHidden ? "i-lucide-eye" : "i-lucide-eye-off",
+      onSelect: () => toggleStream(s.key),
+    },
+    soloItem([s.key]),
+    previousItem(s),
+  ];
+}
+
+function sourceItems(g: SourceGroup): DropdownMenuItem[][] {
+  const source: DropdownMenuItem[] = [
+    {
+      label: g.anyVisible ? "Hide All" : "Show All",
+      icon: g.anyVisible ? "i-lucide-eye-off" : "i-lucide-eye",
+      onSelect: () => togglePod(g),
+    },
+    soloItem(g.streams.map((s) => s.key)),
+    {
+      label: "Go To Pod",
+      icon: "i-lucide-arrow-up-right",
+      onSelect: () => navigateTo(`/resources/pods/${g.namespace}/${g.pod}`),
+    },
+    {
+      label: "Remove",
+      icon: "i-lucide-x",
+      color: "error",
+      onSelect: () => emit("removeSource", g.key),
+    },
+  ];
+  // A single-stream group inlines Load Previous — a submenu would just
+  // duplicate the source items.
+  if (g.streams.length === 1) {
+    source.splice(2, 0, previousItem(g.streams[0]!));
+    return [source];
+  }
+  return [source, g.streams.map((s) => ({ label: s.container, children: streamChildren(s) }))];
+}
+
 // Unpinning freezes the view: the pane renders this snapshot while new
 // chunks land in the buffer behind it. A bounded ring can't keep both
 // the reading position stable and the view live — at flood rates
@@ -133,22 +492,48 @@ const visibleView = computed<BufferView>(() => {
   const needle = filterNeedle.value;
   const hid = hidden.value;
   if (!needle && !hid.size) return dv;
-  // A filtered view is a search — markers without their surrounding
-  // lines are noise. Verdicts are query-stamped on the lines, so a
-  // flush rescans cached lines at one comparison each; only new lines
-  // pay the string scan.
+  if (!needle) {
+    return { rev: dv.rev, lines: dv.lines.filter((line) => !hid.has(line.stream)) };
+  }
+  // Markers ride with their stream's hits (piece 6e4): an instance
+  // boundary matters MORE when lines are elided — filtered hits from
+  // both sides of a restart must not read as one continuous run. A
+  // stream with no visible hits keeps its markers out, though:
+  // dividers without surrounding lines are noise. Verdicts are
+  // query-stamped on the lines, so a flush rescans cached lines at
+  // one comparison each; only new lines pay the string scan.
+  const out: BufferLine[] = [];
+  const hitStreams = new Set<string>();
+  let markers = false;
+  for (const line of dv.lines) {
+    if (hid.has(line.stream)) continue;
+    if (line.marker) {
+      out.push(line);
+      markers = true;
+      continue;
+    }
+    if (line.filterQ !== needle) {
+      line.filterQ = needle;
+      line.filterHit = (line.lower ??= line.text.toLowerCase()).includes(needle);
+    }
+    if (line.filterHit) {
+      out.push(line);
+      hitStreams.add(line.stream);
+    }
+  }
   return {
     rev: dv.rev,
-    lines: dv.lines.filter((line) => {
-      if (hid.has(line.stream)) return false;
-      if (!needle) return true;
-      if (line.filterQ !== needle) {
-        line.filterQ = needle;
-        line.filterHit = !line.marker && (line.lower ??= line.text.toLowerCase()).includes(needle);
-      }
-      return line.filterHit!;
-    }),
+    lines: markers ? out.filter((l) => !l.marker || hitStreams.has(l.stream)) : out,
   };
+});
+
+// Markers ride along in the filtered view, so the match count skips
+// them.
+const filterMatches = computed(() => {
+  if (!filterNeedle.value) return 0;
+  let n = 0;
+  for (const line of visibleView.value.lines) if (!line.marker) n++;
+  return n;
 });
 
 // --- Find: counts, positions, stepping ---
@@ -250,23 +635,26 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 // treatment.
 function lineParts(line: BufferLine, lineIdx: number) {
   const needle = findNeedle.value;
+  // Parts come from the render clip; the scan runs on the full lower
+  // so occurrence indices stay aligned with matchPositions.
+  const text = clipText(line);
   const lower = (line.lower ??= line.text.toLowerCase());
   const active = activeMatch.value >= 0 ? matchPositions.value[activeMatch.value] : undefined;
   const parts: { text: string; hit: boolean; active: boolean }[] = [];
   let pos = 0;
   let occ = 0;
   let idx: number;
-  while ((idx = lower.indexOf(needle, pos)) !== -1) {
-    if (idx > pos) parts.push({ text: line.text.slice(pos, idx), hit: false, active: false });
+  while ((idx = lower.indexOf(needle, pos)) !== -1 && idx < text.length) {
+    if (idx > pos) parts.push({ text: text.slice(pos, idx), hit: false, active: false });
     parts.push({
-      text: line.text.slice(idx, idx + needle.length),
+      text: text.slice(idx, idx + needle.length),
       hit: true,
       active: active?.line === lineIdx && active?.occ === occ,
     });
     pos = idx + needle.length;
     occ++;
   }
-  if (pos < line.text.length) parts.push({ text: line.text.slice(pos), hit: false, active: false });
+  if (pos < text.length) parts.push({ text: text.slice(pos), hit: false, active: false });
   return parts;
 }
 
@@ -290,7 +678,59 @@ const LINE_HEIGHT = 20;
 // Fixed allowance for the timestamp column (12ch) plus its margin.
 const TIMESTAMP_CH = 14;
 
+// --- Long-line clip + full-line slideover ---
+
+// Render clip for pathological line lengths: the pane virtualizes
+// rows, not columns, so nothing else bounds per-row layout cost — a
+// 34k-char line is a ~250,000px-wide row, and the widest line ever
+// seen sets the scroll range for the whole pane. The clip is pixels,
+// not truth: the buffer keeps the full text, filter and find verdicts
+// run on it (a hit beyond the clip counts but can't highlight), and
+// the truncation marker opens the slideover with the whole line.
+// Producers draw the same line — glog caps messages at 15,000.
+// A feel dial, settled by Chris: width is the pane's dominant
+// rendering cost — the tile grid spans the full logical width (see
+// the perf round in ui-redesign.md) — so the cap trades inline line
+// length against scroll smoothness.
+const MAX_RENDER_CH = 10000;
+// Width allowance for the truncation marker after clipped text.
+const MARKER_CH = 18;
+
+function clipText(line: BufferLine): string {
+  if (line.text.length <= MAX_RENDER_CH) return line.text;
+  return (line.clipped ??= line.text.slice(0, MAX_RENDER_CH));
+}
+
+const inspected = shallowRef<BufferLine | null>(null);
+const inspectOpen = ref(false);
+function inspectLine(line: BufferLine) {
+  inspected.value = line;
+  inspectOpen.value = true;
+}
+
 const scrollEl = useTemplateRef("scrollEl");
+
+// Divider labels pin to the visible pane. Width is JS-measured truth —
+// clientWidth excludes scrollbars exactly, where cqw/calc had to
+// hard-code them — but horizontal position is CSS sticky: chasing
+// scrollLeft through scroll events lags the compositor by a frame and
+// the label visibly wobbles. Divider rows widen over the pane's p-3 so
+// the stuck label can travel the full scroll range.
+const paneWidth = ref(0);
+let paneObserver: ResizeObserver | undefined;
+onMounted(() => {
+  if (!scrollEl.value) return;
+  paneObserver = new ResizeObserver(() => {
+    paneWidth.value = scrollEl.value?.clientWidth ?? 0;
+  });
+  paneObserver.observe(scrollEl.value);
+  paneWidth.value = scrollEl.value.clientWidth;
+});
+onBeforeUnmount(() => paneObserver?.disconnect());
+
+const dividerStyle = computed(() => ({
+  width: paneWidth.value ? `${paneWidth.value}px` : "100%",
+}));
 
 const virtualizer = useVirtualizer(
   computed(() => ({
@@ -338,7 +778,11 @@ const virtualRows = computed(() => {
 const paneMinWidth = computed(() => {
   if (!maxLineLength.value) return undefined;
   const prefix = gutterCh.value ? gutterCh.value + 2 : 0;
-  return `${maxLineLength.value + prefix + (showTimestamps.value ? TIMESTAMP_CH : 0)}ch`;
+  // The render clip bounds the widest row (plus the marker's width),
+  // so one pathological line can't set the scroll range.
+  const widest =
+    maxLineLength.value > MAX_RENDER_CH ? MAX_RENDER_CH + MARKER_CH : maxLineLength.value;
+  return `${widest + prefix + (showTimestamps.value ? TIMESTAMP_CH : 0)}ch`;
 });
 
 // --- Sticky-bottom follow ---
@@ -462,8 +906,8 @@ defineExpose({ paused, clear: clearOutput });
       </UInput>
       <!-- Only a filter earns a count: matches are the search result. -->
       <span v-if="filterNeedle" class="text-xs text-muted whitespace-nowrap">
-        {{ visibleView.lines.length }}
-        {{ visibleView.lines.length === 1 ? "match" : "matches" }}
+        {{ filterMatches }}
+        {{ filterMatches === 1 ? "match" : "matches" }}
       </span>
 
       <USwitch v-model="showTimestamps" label="Timestamps" size="sm" />
@@ -536,17 +980,17 @@ defineExpose({ paused, clear: clearOutput });
           >: {{ endedError }}</template
         ></span
       >
-      <UButton size="xs" color="neutral" variant="soft" class="ml-auto" @click="openSource">
+      <UButton size="xs" color="neutral" variant="soft" class="ml-auto" @click="restartAll">
         Resume
       </UButton>
     </div>
     <div
-      v-else-if="startError && (allFailed || resolveError)"
+      v-else-if="allFailed && startError"
       class="flex items-center gap-2 px-3 py-2 mb-2 text-sm border border-error/50 rounded-md"
     >
       <UIcon name="i-lucide-triangle-alert" class="size-4 text-error shrink-0" />
       <span>{{ startError }}</span>
-      <UButton size="xs" color="neutral" variant="soft" class="ml-auto" @click="openSource">
+      <UButton size="xs" color="neutral" variant="soft" class="ml-auto" @click="restartAll">
         Retry
       </UButton>
     </div>
@@ -556,64 +1000,156 @@ defineExpose({ paused, clear: clearOutput });
     gutter, chips wrapping beside it, pod names whole. -->
     <div class="flex-1 min-h-0 flex flex-col">
       <div
-        class="flex items-start gap-3 px-3 py-2 border border-b-0 border-default rounded-t-md shrink-0"
+        class="flex items-start gap-3 px-3 py-3 border border-b-0 border-default rounded-t-md shrink-0"
       >
         <SectionTitle class="h-6 flex items-center shrink-0">Sources</SectionTitle>
         <div class="flex items-center gap-1.5 flex-wrap min-w-0">
-          <button
-            v-for="s in streams"
-            :key="s.key"
-            class="inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-xs bg-elevated/50 hover:bg-elevated transition-colors cursor-pointer"
-            :class="hidden.has(s.key) ? 'opacity-50' : ''"
-            :title="s.startError ?? s.endedError ?? s.key"
-            @click="toggleStream(s.key)"
+          <!-- One grammar at every N: group = source, chips = streams
+          (settled round 2). The identity dot rides the color axis:
+          segment when per-source, chips when per-container. Menus
+          arrive with e2. -->
+          <div
+            v-for="g in groups"
+            :key="g.key"
+            class="inline-flex items-center rounded-md border border-accented/70 bg-elevated/40 overflow-hidden text-xs"
           >
-            <span
-              class="size-2 rounded-full shrink-0"
-              :style="{ backgroundColor: streamMeta.get(s.key)?.color }"
-            />
-            <span class="font-mono" :class="hidden.has(s.key) ? 'line-through' : ''">
-              {{ s.container }}
-            </span>
-            <span v-if="multiPod" class="font-mono text-dimmed">{{ s.pod }}</span>
-            <UIcon v-if="hidden.has(s.key)" name="i-lucide-eye-off" class="size-3 text-dimmed" />
-            <UIcon
-              v-else-if="s.startError"
-              name="i-lucide-triangle-alert"
-              class="size-3 text-error"
-            />
-            <!-- Ended with an error is not a clean end: error tint,
-            message in the tooltip. -->
-            <UIcon
-              v-else-if="s.ended && s.endedError"
-              name="i-lucide-circle-alert"
-              class="size-3 text-error"
-            />
-            <UIcon
-              v-else-if="s.status === 'reconnecting'"
-              name="i-lucide-loader-2"
-              class="size-3 animate-spin text-muted"
-            />
-            <UIcon
-              v-else-if="s.status === 'waiting'"
-              name="i-lucide-clock"
-              class="size-3 text-warning"
-              :title="s.statusReason ?? undefined"
-            />
-            <UIcon v-else-if="s.ended" name="i-lucide-circle-slash" class="size-3 text-dimmed" />
+            <div class="inline-flex items-center bg-elevated">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 h-6 pl-2 cursor-pointer"
+                :title="g.error ?? g.key"
+                @click="togglePod(g)"
+              >
+                <span
+                  v-if="perSourceColors"
+                  class="size-2 rounded-full shrink-0"
+                  :style="{ backgroundColor: g.color }"
+                />
+                <span class="font-mono font-medium">{{ g.pod }}</span>
+                <span v-if="mixedNs" class="font-mono text-dimmed">{{ g.namespace }}</span>
+                <UIcon v-if="g.error" name="i-lucide-triangle-alert" class="size-3 text-error" />
+              </button>
+              <UDropdownMenu :items="sourceItems(g)" size="sm" :content="{ align: 'start' }">
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center h-6 px-1.5 cursor-pointer text-muted hover:text-default transition-colors"
+                  aria-label="Source menu"
+                >
+                  <UIcon name="i-lucide-ellipsis-vertical" class="size-3.5" />
+                </button>
+              </UDropdownMenu>
+            </div>
+            <button
+              v-for="s in g.anyVisible ? g.streams : []"
+              :key="s.key"
+              type="button"
+              class="inline-flex items-center gap-1.5 h-6 px-2 border-l border-default hover:bg-elevated transition-colors cursor-pointer"
+              :class="hidden.has(s.key) ? 'opacity-50' : ''"
+              :title="s.startError ?? s.endedError ?? s.statusReason ?? s.key"
+              @click="toggleStream(s.key)"
+            >
+              <span
+                v-if="!perSourceColors"
+                class="size-2 rounded-full shrink-0"
+                :style="{ backgroundColor: streamMeta.get(s.key)?.color }"
+              />
+              <span class="font-mono" :class="hidden.has(s.key) ? 'line-through' : ''">
+                {{ s.container }}
+              </span>
+              <UIcon v-if="hidden.has(s.key)" name="i-lucide-eye-off" class="size-3 text-dimmed" />
+              <UIcon
+                v-else-if="s.startError"
+                name="i-lucide-triangle-alert"
+                class="size-3 text-error"
+              />
+              <!-- Ended with an error is not a clean end: error tint,
+              message in the tooltip. -->
+              <UIcon
+                v-else-if="s.ended && s.endedError"
+                name="i-lucide-circle-alert"
+                class="size-3 text-error"
+              />
+              <UIcon
+                v-else-if="s.status === 'reconnecting'"
+                name="i-lucide-loader-2"
+                class="size-3 animate-spin text-muted"
+              />
+              <UIcon
+                v-else-if="s.status === 'waiting'"
+                name="i-lucide-clock"
+                class="size-3 text-warning"
+              />
+              <UIcon v-else-if="s.ended" name="i-lucide-circle-slash" class="size-3 text-dimmed" />
+            </button>
+            <!-- Fully hidden: the chips' place is taken by one
+            show-all cell — the segment stays untouched, and the
+            worst status rides along so trouble stays visible. -->
+            <button
+              v-if="!g.anyVisible && g.streams.length"
+              type="button"
+              class="inline-flex items-center gap-1.5 h-6 px-2 border-l border-default hover:bg-elevated transition-colors cursor-pointer text-dimmed"
+              :title="`${g.streams.length} hidden — click to show`"
+              @click="togglePod(g)"
+            >
+              <UIcon name="i-lucide-eye-off" class="size-3" />
+              {{ g.streams.length }}
+              <UIcon
+                v-if="worstStatusIcon(g.streams)"
+                :name="worstStatusIcon(g.streams)!.name"
+                class="size-3"
+                :class="worstStatusIcon(g.streams)!.cls"
+              />
+            </button>
+          </div>
+
+          <!-- The one composition affordance: the label names both
+          palette verbs (pods to add, recents to restore). -->
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 h-6 px-2 rounded-md text-xs border border-dashed border-accented text-muted hover:text-default hover:border-inverted/40 transition-colors cursor-pointer"
+            @click="emit('add')"
+          >
+            <UIcon name="i-lucide-plus" class="size-3" />
+            Add / Restore
           </button>
         </div>
       </div>
 
-      <!-- Log pane -->
+      <!-- Log pane. The scroller's native bars stay COMPLETELY
+      unstyled: any scrollbar styling (::-webkit-scrollbar, even
+      scrollbar-width) risks WebKit's synchronous scroll path —
+      profiled at ~3 main-thread frames/s on wide rows. Horizontal
+      scroll without a trackpad is Shift+wheel. -->
       <div class="relative flex-1 min-h-0 border border-default rounded-b-md bg-sunken">
         <div
           ref="scrollEl"
-          class="h-full overflow-auto font-mono text-xs leading-5 p-3"
+          class="log-text-fast h-full overflow-auto font-mono text-xs leading-5 p-3"
           @scroll.passive="onScroll"
         >
+          <!-- Empty composition: the message lives inside the pane —
+          the chrome around it stays put (the settled mock shape). -->
           <div
-            v-if="!displayView.lines.length"
+            v-if="!sources.length"
+            class="h-full flex flex-col items-center justify-center gap-3 text-dimmed"
+          >
+            <template v-if="invalid?.length">
+              <span class="text-toned">Unrecognized log source:</span>
+              <span class="font-mono">{{ invalid.join(", ") }}</span>
+            </template>
+            <span v-else>No log sources.</span>
+            <UButton
+              icon="i-lucide-plus"
+              color="neutral"
+              variant="soft"
+              size="sm"
+              @click="emit('add')"
+            >
+              Add Source
+            </UButton>
+          </div>
+
+          <div
+            v-else-if="!displayView.lines.length"
             class="h-full flex items-center justify-center text-dimmed"
           >
             {{ anyRunning || resolving ? "Waiting for logs..." : "No log output." }}
@@ -639,35 +1175,44 @@ defineExpose({ paused, clear: clearOutput });
               drops, dashed to distinguish from restarts. -->
               <div
                 v-if="row.line.marker === 'gap'"
-                class="absolute top-0 left-0 w-full h-5 flex items-center gap-3 select-none"
+                class="absolute top-0 -left-3 w-[calc(100%+1.5rem)] h-5 select-none"
                 :style="{ transform: `translateY(${row.start}px)` }"
               >
-                <span class="flex-1 border-t border-dashed border-default" />
-                <span class="text-dimmed"
-                  ><span :style="{ color: streamMeta.get(row.line.stream)?.color }">{{
-                    streamMeta.get(row.line.stream)?.container
-                  }}</span>
-                  — {{ row.line.evicted?.toLocaleString() }} lines evicted</span
-                >
-                <span class="flex-1 border-t border-dashed border-default" />
+                <!-- The divider row spans the full scroll width, so a
+                label centered in it would sit off-screen whenever long
+                lines stretch the pane. The inner span is pane-width
+                and sticky: the centered anatomy rides in view at any
+                scroll position without chasing scroll events. -->
+                <span class="sticky left-0 flex h-5 items-center gap-3" :style="dividerStyle">
+                  <span class="flex-1 border-t border-dashed border-default" />
+                  <span class="text-dimmed whitespace-nowrap"
+                    ><span :style="{ color: streamMeta.get(row.line.stream)?.color }">{{
+                      streamMeta.get(row.line.stream)?.prefix
+                    }}</span>
+                    — {{ row.line.evicted?.toLocaleString() }} lines evicted</span
+                  >
+                  <span class="flex-1 border-t border-dashed border-default" />
+                </span>
               </div>
               <!-- Restart divider, stream-attributed; no timestamp
               column, spans the pane width. -->
               <div
                 v-else-if="row.line.marker === 'restart'"
-                class="absolute top-0 left-0 w-full h-5 flex items-center gap-3 select-none"
+                class="absolute top-0 -left-3 w-[calc(100%+1.5rem)] h-5 select-none"
                 :style="{ transform: `translateY(${row.start}px)` }"
               >
-                <span class="flex-1 border-t border-default" />
-                <span class="text-dimmed"
-                  ><span :style="{ color: streamMeta.get(row.line.stream)?.color }">{{
-                    streamMeta.get(row.line.stream)?.container
-                  }}</span>
-                  restarted<template v-if="row.line.exitCode !== undefined">
-                    (exit {{ row.line.exitCode }})</template
-                  ></span
-                >
-                <span class="flex-1 border-t border-default" />
+                <span class="sticky left-0 flex h-5 items-center gap-3" :style="dividerStyle">
+                  <span class="flex-1 border-t border-default" />
+                  <span class="text-dimmed whitespace-nowrap"
+                    ><span :style="{ color: streamMeta.get(row.line.stream)?.color }">{{
+                      streamMeta.get(row.line.stream)?.prefix
+                    }}</span>
+                    restarted<template v-if="row.line.exitCode !== undefined">
+                      (exit {{ row.line.exitCode }})</template
+                    ></span
+                  >
+                  <span class="flex-1 border-t border-default" />
+                </span>
               </div>
               <div
                 v-else
@@ -704,24 +1249,38 @@ defineExpose({ paused, clear: clearOutput });
                       >{{ p.text }}</span
                     ><template v-else>{{ p.text }}</template></template
                   ></template
-                ><template v-else>{{ row.line.text }}</template>
+                ><template v-else>{{ clipText(row.line) }}</template
+                ><button
+                  v-if="row.line.text.length > MAX_RENDER_CH"
+                  type="button"
+                  class="ml-2 px-1 rounded-xs bg-elevated text-dimmed hover:text-default transition-colors cursor-pointer select-none"
+                  title="View full line"
+                  @click="inspectLine(row.line)"
+                >
+                  … +{{ (row.line.text.length - MAX_RENDER_CH).toLocaleString() }} chars
+                </button>
               </div>
             </template>
           </div>
         </div>
 
+        <!-- Overlay scrollbar thumbs (see the overlay block in the
+        script): strips are the click/wheel gutters, inner divs the
+        draggable thumbs. -->
         <UButton
           v-if="!pinned"
           icon="i-lucide-arrow-down-to-line"
           size="xs"
           color="neutral"
           variant="solid"
-          class="absolute bottom-3 right-4"
+          class="absolute bottom-4 right-4"
           @click="jumpToBottom"
         >
           Latest
         </UButton>
       </div>
     </div>
+
+    <LogLineSlideover v-model:open="inspectOpen" :line="inspected" />
   </div>
 </template>

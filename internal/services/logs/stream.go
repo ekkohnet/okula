@@ -90,6 +90,11 @@ type LogChunk struct {
 	// chunk — they could never have survived to a paint, but the count
 	// keeps the viewer's gap markers honest.
 	Dropped int `json:"dropped,omitempty"`
+	// Final marks a previous-mode session's last chunk (always emitted,
+	// even empty). Event emits can reorder by payload size — a huge
+	// chunk marshals slower than the tiny ended event — so the caller
+	// finalizes on this flag, never on LogStreamEnded racing past it.
+	Final bool `json:"final,omitempty"`
 }
 
 type LogStreamEnded struct {
@@ -107,6 +112,13 @@ type LogStreamStatus struct {
 type PodContainers struct {
 	Containers     []string `json:"containers"`
 	InitContainers []string `json:"initContainers"`
+	// Keyed by container name. RestartCount > 0 means a previous
+	// instance exists — the Load Previous enable rule; LastExitCodes
+	// carries that instance's exit code when known (the un-witnessed
+	// boundary divider's label — the previous logs themselves can't
+	// tell you why they ended).
+	RestartCounts map[string]int32 `json:"restartCounts"`
+	LastExitCodes map[string]int32 `json:"lastExitCodes"`
 }
 
 // reopenState is the reopen loop's state. One session goroutine owns it, so
@@ -260,15 +272,16 @@ func (svc *Service) pumpStream(ctx context.Context, stream io.Reader, sess *sess
 	// the emit marshals asynchronously.
 	batch := make([]LogLine, 0, 256)
 	dropped := 0
-	flush := func() {
-		if len(batch) == 0 && dropped == 0 {
+	flush := func(final bool) {
+		if len(batch) == 0 && dropped == 0 && !final {
 			return
 		}
 		if len(batch) > flushRingCap {
 			dropped += len(batch) - flushRingCap
 			batch = batch[len(batch)-flushRingCap:]
 		}
-		application.Get().Event.Emit("LogChunk:"+sess.id, LogChunk{Lines: batch, Dropped: dropped})
+		application.Get().Event.Emit("LogChunk:"+sess.id,
+			LogChunk{Lines: batch, Dropped: dropped, Final: final})
 		batch = make([]LogLine, 0, 256)
 		dropped = 0
 	}
@@ -280,7 +293,10 @@ func (svc *Service) pumpStream(ctx context.Context, stream io.Reader, sess *sess
 		select {
 		case line, ok := <-lines:
 			if !ok {
-				flush()
+				// Previous mode always closes with a final chunk (even
+				// empty) — the caller finalizes on it, immune to the
+				// chunk/ended emit-order race.
+				flush(sess.opts.Previous)
 				return readErr
 			}
 			if st.seam.skip(line) {
@@ -297,7 +313,7 @@ func (svc *Service) pumpStream(ctx context.Context, stream io.Reader, sess *sess
 				batch = append(batch[:0], batch[len(batch)-flushRingCap:]...)
 			}
 		case <-ticker.C:
-			flush()
+			flush(false)
 		case <-ctx.Done():
 			return ctx.Err()
 		}

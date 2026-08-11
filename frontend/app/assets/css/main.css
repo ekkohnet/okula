@@ -24,3 +24,17 @@
 .dark {
   /* --ui-primary: var(--ui-color-secondary-500); */
 }
+
+/* Scrollbars stay native and UNSTYLED everywhere: any scrollbar
+   styling (::-webkit-scrollbar, even scrollbar-width) opts WebKit out
+   of its async scrolling path — profiled in the log pane at ~3
+   main-thread frames/s. Mouse horizontal scroll is Shift+wheel. */
+
+/* WebKit's complex text path costs per-glyph feature work: log output
+   needs no ligatures or kerning, and dropping them keeps huge mono
+   runs on the fast shaping path (log pane perf round). */
+.log-text-fast {
+  font-kerning: none;
+  font-variant-ligatures: none;
+  text-rendering: optimizeSpeed;
+}
